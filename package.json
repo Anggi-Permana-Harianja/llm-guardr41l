@@ -2,12 +2,13 @@
   "name": "llm-guardr41l",
   "displayName": "LLM Guardr41l",
   "description": "Prevent LLMs from making unsolicited changes to your codebase. Monitor AI-generated code from Copilot, Claude, Cursor, etc. and enforce rules.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "llm-guardr41l",
   "engines": {
     "vscode": "^1.85.0"
   },
   "license": "SEE LICENSE IN LICENSE",
+  "icon": "icon.png",
   "categories": [
     "Other",
     "Machine Learning",
