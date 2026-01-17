@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { Violation } from './diff-validator';
 import { RulesConfig } from './rules';
+import { RejectionAnalyzer, saveRejectionAnalysis, showRuleSuggestions } from './rejection-analyzer';
 
 export interface LogEntry {
   timestamp: string;
@@ -142,6 +143,38 @@ export function logRejection(logId: string): void {
     entry.action = 'reject';
     entry.metadata.approved = false;
     writeLogFile(logPath, logFile);
+
+    // Trigger rejection analysis asynchronously
+    analyzeRejectionsAsync(logFile.entries);
+  }
+}
+
+/**
+ * Analyze rejections and show suggestions if threshold is met
+ */
+async function analyzeRejectionsAsync(entries: LogEntry[]): Promise<void> {
+  try {
+    const config = vscode.workspace.getConfiguration('llm-guardrail');
+    const threshold = config.get<number>('suggestionThreshold', 3);
+
+    const analyzer = new RejectionAnalyzer(threshold);
+    const analysis = await analyzer.analyze(entries);
+
+    // Save analysis for future reference
+    saveRejectionAnalysis(analysis);
+
+    // Check for new suggestions
+    const suggestions = analyzer.getSuggestedRules();
+    if (suggestions.length > 0) {
+      const message = `Guardrail: ${suggestions.length} rule suggestion(s) based on rejection patterns`;
+      const action = await vscode.window.showInformationMessage(message, 'Review Suggestions', 'Dismiss');
+
+      if (action === 'Review Suggestions') {
+        await showRuleSuggestions(suggestions);
+      }
+    }
+  } catch (error) {
+    console.error('Failed to analyze rejections:', error);
   }
 }
 

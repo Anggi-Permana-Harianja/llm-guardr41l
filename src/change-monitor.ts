@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { loadRules, RulesConfig } from './rules';
 import { validateAgainstRules, ValidationResult } from './diff-validator';
 import { logGeneration } from './logger';
+import { getDiagnosticsManager } from './diagnostics-manager';
 
 export interface ChangeEvent {
   document: vscode.TextDocument;
@@ -97,6 +98,10 @@ export class ChangeMonitor {
         this.documentSnapshots.delete(uri);
         this.pendingChanges.delete(uri);
         this.clearDebounce(uri);
+
+        // Clear diagnostics for closed document
+        const diagnosticsManager = getDiagnosticsManager();
+        diagnosticsManager.clearDiagnostics(document.uri);
       })
     );
 
@@ -183,11 +188,20 @@ export class ChangeMonitor {
       this.documentSnapshots.set(documentUri, change.newContent);
       this.pendingChanges.delete(documentUri);
       this.isProcessing.delete(documentUri);
+
+      // Clear diagnostics for this document
+      const diagnosticsManager = getDiagnosticsManager();
+      diagnosticsManager.clearDiagnostics(vscode.Uri.parse(documentUri));
     }
   }
 
   public async rejectChange(documentUri: string): Promise<void> {
     const change = this.pendingChanges.get(documentUri);
+
+    // Clear diagnostics for this document
+    const diagnosticsManager = getDiagnosticsManager();
+    diagnosticsManager.clearDiagnostics(vscode.Uri.parse(documentUri));
+
     if (change && this.config.autoRevertOnReject) {
       const originalContent = change.originalContent;
       this.pendingChanges.delete(documentUri);
@@ -343,6 +357,10 @@ export class ChangeMonitor {
         document.fileName.split('/').pop()
       );
 
+      // Update inline diagnostics (squiggles in editor)
+      const diagnosticsManager = getDiagnosticsManager();
+      diagnosticsManager.updateDiagnostics(document, validation.violations, validation.diff.changes);
+
       // Log the change
       logGeneration(
         '[Auto-detected change]',
@@ -356,8 +374,8 @@ export class ChangeMonitor {
         }
       );
 
-      // Notify handler
-      if (this.onPendingChange) {
+      // Notify handler (only if there are violations requiring attention)
+      if (this.onPendingChange && validation.violations.length > 0) {
         this.onPendingChange(changeEvent, validation);
       }
     }

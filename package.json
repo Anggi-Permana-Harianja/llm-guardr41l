@@ -56,6 +56,18 @@
       {
         "command": "llm-guardrail.generateRules",
         "title": "Guardrail: Generate Rules"
+      },
+      {
+        "command": "llm-guardrail.showDashboard",
+        "title": "Guardrail: Show Metrics Dashboard"
+      },
+      {
+        "command": "llm-guardrail.scanProject",
+        "title": "Guardrail: Scan Project & Generate Rules"
+      },
+      {
+        "command": "llm-guardrail.showProblemsPanel",
+        "title": "Guardrail: Show Problems Panel"
       }
     ],
     "configuration": {
@@ -127,6 +139,16 @@
             "*.log"
           ],
           "description": "File patterns to ignore when monitoring"
+        },
+        "llm-guardrail.suggestionThreshold": {
+          "type": "number",
+          "default": 3,
+          "description": "Number of rejections with same pattern before suggesting a new rule"
+        },
+        "llm-guardrail.dashboardPeriodDays": {
+          "type": "number",
+          "default": 30,
+          "description": "Default time period (in days) for the metrics dashboard"
         }
       }
     }

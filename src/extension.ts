@@ -4,10 +4,14 @@ import * as fs from 'fs';
 import { loadRules, createDefaultRulesFile, getRulesFilePath, generateRulesInteractive, rulesFileExists } from './rules';
 import { generateCode, isConfigured, getCurrentProvider, getCurrentModel } from './llm-proxy';
 import { validateAgainstRules, ValidationResult } from './diff-validator';
-import { logGeneration, logApproval, logRejection, logError, showLogsInEditor } from './logger';
+import { logGeneration, logApproval, logRejection, logError, showLogsInEditor, getRecentLogs } from './logger';
 import { getChangeMonitor, disposeChangeMonitor, ChangeEvent } from './change-monitor';
+import { disposeDiagnosticsManager } from './diagnostics-manager';
+import { MetricsCalculator } from './metrics-calculator';
+import { scanProjectInteractive } from './project-scanner';
 
 let currentPanel: vscode.WebviewPanel | undefined;
+let dashboardPanel: vscode.WebviewPanel | undefined;
 let currentValidation: ValidationResult | undefined;
 let currentGeneratedCode: string | undefined;
 let currentLogId: string | undefined;
@@ -91,6 +95,30 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
+  // Register show problems panel command
+  const showProblemsCommand = vscode.commands.registerCommand(
+    'llm-guardrail.showProblemsPanel',
+    () => {
+      vscode.commands.executeCommand('workbench.action.problems.focus');
+    }
+  );
+
+  // Register show dashboard command
+  const showDashboardCommand = vscode.commands.registerCommand(
+    'llm-guardrail.showDashboard',
+    async () => {
+      await showMetricsDashboard(context);
+    }
+  );
+
+  // Register scan project command
+  const scanProjectCommand = vscode.commands.registerCommand(
+    'llm-guardrail.scanProject',
+    async () => {
+      await scanProjectInteractive();
+    }
+  );
+
   context.subscriptions.push(
     generateCodeCommand,
     editRulesCommand,
@@ -98,7 +126,10 @@ export function activate(context: vscode.ExtensionContext) {
     toggleMonitorCommand,
     approveChangeCommand,
     rejectChangeCommand,
-    generateRulesCommand
+    generateRulesCommand,
+    showProblemsCommand,
+    showDashboardCommand,
+    scanProjectCommand
   );
 
   // Auto-detect missing rules.yaml and prompt user
@@ -143,24 +174,25 @@ async function handleMonitoredChange(
     e => e.document.uri.toString() === currentDocumentUri
   );
 
-  // Show notification with quick actions
+  // Diagnostics are now shown inline via DiagnosticsManager (squiggles in editor)
+  // Only show popup notification for errors that require manual review
   const hasErrors = validation.violations.some(v => v.severity === 'error');
   const violationCount = validation.violations.length;
 
-  let message: string;
-  if (hasErrors) {
-    message = `Guardrail: Detected ${validation.diff.totalLinesChanged} line change with ${violationCount} violation(s) in ${fileName}`;
-  } else if (violationCount > 0) {
-    message = `Guardrail: Detected ${validation.diff.totalLinesChanged} line change with ${violationCount} warning(s) in ${fileName}`;
-  } else {
-    message = `Guardrail: Detected ${validation.diff.totalLinesChanged} line change in ${fileName}`;
+  // For warnings only, skip popup - user can see them in Problems panel
+  if (!hasErrors) {
+    // Auto-approve if no errors, just warnings
+    // The diagnostics are still visible in the Problems panel
+    return;
   }
+
+  // Only show popup for errors requiring attention
+  const message = `Guardrail: ${violationCount} violation(s) in ${fileName}. Review required.`;
 
   const action = await vscode.window.showWarningMessage(
     message,
     'Review',
-    'Approve',
-    'Reject'
+    'View Problems'
   );
 
   switch (action) {
@@ -184,15 +216,12 @@ async function handleMonitoredChange(
         valid: validation.valid
       });
       break;
-    case 'Approve':
-      await handleMonitorApprove();
-      break;
-    case 'Reject':
-      await handleMonitorReject();
+    case 'View Problems':
+      vscode.commands.executeCommand('workbench.action.problems.focus');
       break;
     default:
-      // User dismissed - keep changes but mark as reviewed
-      await handleMonitorApprove();
+      // User dismissed - keep pending for later review
+      break;
   }
 }
 
@@ -775,9 +804,270 @@ function resetState(): void {
   isMonitoredChange = false;
 }
 
+async function showMetricsDashboard(context: vscode.ExtensionContext): Promise<void> {
+  if (dashboardPanel) {
+    dashboardPanel.reveal();
+    return;
+  }
+
+  dashboardPanel = vscode.window.createWebviewPanel(
+    'llmGuardrailDashboard',
+    'LLM Guardrail - Metrics Dashboard',
+    vscode.ViewColumn.One,
+    {
+      enableScripts: true,
+      retainContextWhenHidden: true
+    }
+  );
+
+  const calculator = new MetricsCalculator();
+  const logs = getRecentLogs(1000);
+  const metrics = calculator.calculate(logs, 30);
+
+  dashboardPanel.webview.html = getDashboardWebviewContent(metrics);
+
+  dashboardPanel.webview.onDidReceiveMessage(
+    async (message) => {
+      if (message.type === 'refresh') {
+        const newLogs = getRecentLogs(1000);
+        const newMetrics = calculator.calculate(newLogs, message.period || 30);
+        dashboardPanel!.webview.postMessage({ type: 'metrics', data: newMetrics });
+      } else if (message.type === 'export') {
+        const csvContent = calculator.exportAsCsv(metrics);
+        const uri = await vscode.window.showSaveDialog({
+          filters: { 'CSV': ['csv'] },
+          defaultUri: vscode.Uri.file('guardrail-metrics.csv')
+        });
+        if (uri) {
+          fs.writeFileSync(uri.fsPath, csvContent);
+          vscode.window.showInformationMessage(`Metrics exported to ${uri.fsPath}`);
+        }
+      }
+    },
+    undefined,
+    context.subscriptions
+  );
+
+  dashboardPanel.onDidDispose(() => {
+    dashboardPanel = undefined;
+  });
+}
+
+function getDashboardWebviewContent(metrics: import('./metrics-calculator').MetricsSummary): string {
+  const violationsByTypeHtml = Object.entries(metrics.violationsByType)
+    .map(([type, count]) => `<div class="stat-item"><span class="type-badge ${type}">${type}</span><span class="count">${count}</span></div>`)
+    .join('') || '<div class="empty">No violations recorded</div>';
+
+  const topRulesHtml = metrics.topViolatedRules
+    .map(rule => `
+      <tr>
+        <td><span class="type-badge ${rule.ruleType}">${rule.ruleType}</span></td>
+        <td>${escapeHtml(rule.description)}</td>
+        <td>${rule.count}</td>
+        <td>${(rule.percentage * 100).toFixed(1)}%</td>
+      </tr>
+    `)
+    .join('') || '<tr><td colspan="4" class="empty">No violations recorded</td></tr>';
+
+  const trendsData = JSON.stringify(metrics.trendsOverTime);
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guardrail Metrics Dashboard</title>
+  <style>
+    :root {
+      --bg: var(--vscode-editor-background, #1e1e1e);
+      --fg: var(--vscode-editor-foreground, #d4d4d4);
+      --border: var(--vscode-panel-border, #3c3c3c);
+      --card-bg: var(--vscode-editorWidget-background, #252526);
+      --error: var(--vscode-errorForeground, #f14c4c);
+      --warning: var(--vscode-editorWarning-foreground, #cca700);
+      --success: var(--vscode-terminal-ansiGreen, #23d18b);
+      --info: var(--vscode-textLink-foreground, #3794ff);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--vscode-font-family, sans-serif);
+      font-size: 13px;
+      background: var(--bg);
+      color: var(--fg);
+      padding: 20px;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid var(--border);
+    }
+    .header h1 { font-size: 20px; font-weight: 500; }
+    .controls { display: flex; gap: 10px; }
+    .controls select, .controls button {
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--card-bg);
+      color: var(--fg);
+      cursor: pointer;
+    }
+    .controls button:hover { background: var(--border); }
+    .summary-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 25px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+    }
+    .card h3 { font-size: 12px; opacity: 0.7; margin-bottom: 8px; text-transform: uppercase; }
+    .card .value { font-size: 28px; font-weight: 600; }
+    .card .value.success { color: var(--success); }
+    .card .value.warning { color: var(--warning); }
+    .card .value.error { color: var(--error); }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 25px; }
+    .section-title { font-size: 14px; font-weight: 500; margin-bottom: 15px; }
+    .chart-container { height: 200px; display: flex; align-items: flex-end; gap: 2px; padding: 10px 0; }
+    .chart-bar {
+      flex: 1;
+      background: var(--info);
+      min-height: 2px;
+      border-radius: 2px 2px 0 0;
+      transition: height 0.3s;
+    }
+    .chart-bar:hover { opacity: 0.8; }
+    .stat-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    .stat-item:last-child { border-bottom: none; }
+    .type-badge {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+    .type-badge.scope { background: rgba(55, 148, 255, 0.2); color: var(--info); }
+    .type-badge.content { background: rgba(241, 76, 76, 0.2); color: var(--error); }
+    .type-badge.dependencies { background: rgba(204, 167, 0, 0.2); color: var(--warning); }
+    .type-badge.refactor { background: rgba(35, 209, 139, 0.2); color: var(--success); }
+    .type-badge.threshold { background: rgba(156, 108, 214, 0.2); color: #9c6cd6; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid var(--border); }
+    th { font-size: 11px; text-transform: uppercase; opacity: 0.7; }
+    .empty { text-align: center; opacity: 0.5; padding: 20px; }
+    .severity-bar { display: flex; height: 24px; border-radius: 4px; overflow: hidden; margin-top: 10px; }
+    .severity-bar .error { background: var(--error); }
+    .severity-bar .warning { background: var(--warning); }
+    .severity-bar span { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500; color: #000; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Guardrail Metrics Dashboard</h1>
+    <div class="controls">
+      <select id="period">
+        <option value="7">Last 7 days</option>
+        <option value="30" selected>Last 30 days</option>
+        <option value="90">Last 90 days</option>
+      </select>
+      <button onclick="refresh()">Refresh</button>
+      <button onclick="exportCsv()">Export CSV</button>
+    </div>
+  </div>
+
+  <div class="summary-cards">
+    <div class="card">
+      <h3>Total Interactions</h3>
+      <div class="value">${metrics.totalInteractions}</div>
+    </div>
+    <div class="card">
+      <h3>Violations Caught</h3>
+      <div class="value warning">${metrics.totalViolations}</div>
+    </div>
+    <div class="card">
+      <h3>Approval Rate</h3>
+      <div class="value success">${(metrics.approvalRate * 100).toFixed(1)}%</div>
+    </div>
+    <div class="card">
+      <h3>Rejection Rate</h3>
+      <div class="value error">${(metrics.rejectionRate * 100).toFixed(1)}%</div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="section-title">Violations Over Time</div>
+      <div class="chart-container" id="trendChart"></div>
+    </div>
+    <div class="card">
+      <div class="section-title">Violations by Type</div>
+      ${violationsByTypeHtml}
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom: 25px;">
+    <div class="section-title">Severity Distribution</div>
+    <div class="severity-bar">
+      <span class="error" style="flex: ${metrics.violationsBySeverity.error || 0.1}">Errors: ${metrics.violationsBySeverity.error}</span>
+      <span class="warning" style="flex: ${metrics.violationsBySeverity.warning || 0.1}">Warnings: ${metrics.violationsBySeverity.warning}</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">Top Violated Rules</div>
+    <table>
+      <thead>
+        <tr><th>Type</th><th>Description</th><th>Count</th><th>%</th></tr>
+      </thead>
+      <tbody>${topRulesHtml}</tbody>
+    </table>
+  </div>
+
+  <script>
+    const vscode = acquireVsCodeApi();
+    const trendsData = ${trendsData};
+
+    function renderChart() {
+      const container = document.getElementById('trendChart');
+      const maxViolations = Math.max(...trendsData.map(d => d.violations), 1);
+      container.innerHTML = trendsData.map(d =>
+        '<div class="chart-bar" style="height: ' + (d.violations / maxViolations * 100) + '%" title="' + d.date + ': ' + d.violations + ' violations"></div>'
+      ).join('');
+    }
+
+    function refresh() {
+      const period = document.getElementById('period').value;
+      vscode.postMessage({ type: 'refresh', period: parseInt(period) });
+    }
+
+    function exportCsv() {
+      vscode.postMessage({ type: 'export' });
+    }
+
+    window.addEventListener('message', event => {
+      if (event.data.type === 'metrics') {
+        location.reload(); // Simple refresh for now
+      }
+    });
+
+    renderChart();
+  </script>
+</body>
+</html>`;
+}
+
 export function deactivate() {
   if (currentPanel) {
     currentPanel.dispose();
   }
+  if (dashboardPanel) {
+    dashboardPanel.dispose();
+  }
   disposeChangeMonitor();
+  disposeDiagnosticsManager();
 }

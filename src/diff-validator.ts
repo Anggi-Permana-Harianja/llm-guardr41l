@@ -78,8 +78,21 @@ export function computeDiff(original: string, generated: string): DiffResult {
   };
 }
 
+function getChangedLineNumbers(diff: DiffResult): number[] {
+  const lineNumbers: number[] = [];
+  for (const change of diff.changes) {
+    if (change.type === 'added' && change.lineNumber !== undefined) {
+      for (let i = 0; i < (change.count || 1); i++) {
+        lineNumbers.push(change.lineNumber + i);
+      }
+    }
+  }
+  return lineNumbers.length > 0 ? lineNumbers : [1];
+}
+
 function validateScopeRule(rule: ScopeRule, original: string, generated: string, diff: DiffResult, fileName?: string): Violation[] {
   const violations: Violation[] = [];
+  const changedLines = getChangedLineNumbers(diff);
 
   // Check file scope
   if (rule.files && rule.files.length > 0 && fileName) {
@@ -97,7 +110,8 @@ function validateScopeRule(rule: ScopeRule, original: string, generated: string,
         ruleType: 'scope',
         description: 'File modification outside allowed scope',
         severity: 'error',
-        details: `File "${fileName}" is not in the allowed files list: ${rule.files.join(', ')}`
+        details: `File "${fileName}" is not in the allowed files list: ${rule.files.join(', ')}`,
+        lineNumbers: changedLines
       });
     }
   }
@@ -127,7 +141,8 @@ function validateScopeRule(rule: ScopeRule, original: string, generated: string,
         ruleType: 'scope',
         description: 'Changes outside function scope',
         severity: 'warning',
-        details: `Expected changes only in functions: ${rule.functions.join(', ')}`
+        details: `Expected changes only in functions: ${rule.functions.join(', ')}`,
+        lineNumbers: changedLines
       });
     }
   }
@@ -145,7 +160,8 @@ function validateScopeRule(rule: ScopeRule, original: string, generated: string,
           ruleType: 'scope',
           description: 'Pattern not found in original code',
           severity: 'warning',
-          details: `The pattern "${rule.pattern}" was not found in the original code`
+          details: `The pattern "${rule.pattern}" was not found in the original code`,
+          lineNumbers: changedLines
         });
       }
     }
@@ -157,6 +173,7 @@ function validateScopeRule(rule: ScopeRule, original: string, generated: string,
 function validateRefactorRule(rule: RefactorRule, original: string, generated: string, diff: DiffResult): Violation[] {
   const violations: Violation[] = [];
   const forbiddenActions = rule.forbid || [];
+  const changedLines = getChangedLineNumbers(diff);
 
   for (const action of forbiddenActions) {
     switch (action.toLowerCase()) {
@@ -176,7 +193,8 @@ function validateRefactorRule(rule: RefactorRule, original: string, generated: s
             ruleType: 'refactor',
             description: 'Possible variable rename detected',
             severity: 'warning',
-            details: `Variables removed: ${removedNotInAdded.join(', ')}. Variables added: ${addedNotInRemoved.join(', ')}`
+            details: `Variables removed: ${removedNotInAdded.join(', ')}. Variables added: ${addedNotInRemoved.join(', ')}`,
+            lineNumbers: changedLines
           });
         }
         break;
@@ -194,7 +212,8 @@ function validateRefactorRule(rule: RefactorRule, original: string, generated: s
               ruleType: 'refactor',
               description: 'Unsolicited error handling added',
               severity: 'warning',
-              details: 'New error handling code was added without being requested'
+              details: 'New error handling code was added without being requested',
+              lineNumbers: changedLines
             });
             break;
           }
@@ -217,7 +236,8 @@ function validateRefactorRule(rule: RefactorRule, original: string, generated: s
               ruleType: 'refactor',
               description: 'Unsolicited comments added',
               severity: 'warning',
-              details: 'New comments were added without being requested'
+              details: 'New comments were added without being requested',
+              lineNumbers: changedLines
             });
             break;
           }
@@ -237,7 +257,8 @@ function validateRefactorRule(rule: RefactorRule, original: string, generated: s
             ruleType: 'refactor',
             description: 'Formatting-only changes detected',
             severity: 'warning',
-            details: 'Code was reformatted without changing functionality'
+            details: 'Code was reformatted without changing functionality',
+            lineNumbers: changedLines
           });
         }
         break;
@@ -250,6 +271,7 @@ function validateRefactorRule(rule: RefactorRule, original: string, generated: s
 
 function validateDependenciesRule(rule: DependenciesRule, original: string, generated: string, diff: DiffResult): Violation[] {
   const violations: Violation[] = [];
+  const changedLines = getChangedLineNumbers(diff);
 
   const addedContent = diff.changes.filter(c => c.type === 'added').map(c => c.value).join('\n');
 
@@ -291,7 +313,8 @@ function validateDependenciesRule(rule: DependenciesRule, original: string, gene
         ruleType: 'dependencies',
         description: 'Unauthorized dependency added',
         severity: 'error',
-        details: `The dependency "${imp}" is not in the allowed list: ${rule.allowed.join(', ')}`
+        details: `The dependency "${imp}" is not in the allowed list: ${rule.allowed.join(', ')}`,
+        lineNumbers: changedLines
       });
     }
   }
@@ -308,7 +331,8 @@ function validateDependenciesRule(rule: DependenciesRule, original: string, gene
         ruleType: 'dependencies',
         description: 'Forbidden dependency added',
         severity: 'error',
-        details: `The dependency "${imp}" is in the forbidden list`
+        details: `The dependency "${imp}" is in the forbidden list`,
+        lineNumbers: changedLines
       });
     }
   }
@@ -318,6 +342,7 @@ function validateDependenciesRule(rule: DependenciesRule, original: string, gene
 
 function validateContentRule(rule: ContentRule, original: string, generated: string, diff: DiffResult): Violation[] {
   const violations: Violation[] = [];
+  const changedLines = getChangedLineNumbers(diff);
 
   const addedContent = diff.changes.filter(c => c.type === 'added').map(c => c.value).join('\n');
 
@@ -330,7 +355,8 @@ function validateContentRule(rule: ContentRule, original: string, generated: str
           ruleType: 'content',
           description: 'Forbidden content added',
           severity: 'error',
-          details: `The content "${forbidden}" was added but is forbidden`
+          details: `The content "${forbidden}" was added but is forbidden`,
+          lineNumbers: changedLines
         });
       }
     }
@@ -350,7 +376,8 @@ function validateContentRule(rule: ContentRule, original: string, generated: str
             ruleType: 'content',
             description: 'Forbidden pattern detected',
             severity: 'error',
-            details: `The pattern "${pattern}" was found in added content`
+            details: `The pattern "${pattern}" was found in added content`,
+            lineNumbers: changedLines
           });
         }
       } catch {
@@ -378,7 +405,8 @@ function validateContentRule(rule: ContentRule, original: string, generated: str
         ruleType: 'content',
         description: 'Too many new constructs introduced',
         severity: 'warning',
-        details: `${newFunctions.length} new functions/methods were introduced: ${newFunctions.slice(0, 5).join(', ')}${newFunctions.length > 5 ? '...' : ''}`
+        details: `${newFunctions.length} new functions/methods were introduced: ${newFunctions.slice(0, 5).join(', ')}${newFunctions.length > 5 ? '...' : ''}`,
+        lineNumbers: changedLines
       });
     }
   }
@@ -388,6 +416,7 @@ function validateContentRule(rule: ContentRule, original: string, generated: str
 
 function validateThresholdRule(rule: ThresholdRule, diff: DiffResult): Violation[] {
   const violations: Violation[] = [];
+  const changedLines = getChangedLineNumbers(diff);
 
   if (rule.max_lines_changed !== undefined && diff.totalLinesChanged > rule.max_lines_changed) {
     violations.push({
@@ -395,7 +424,8 @@ function validateThresholdRule(rule: ThresholdRule, diff: DiffResult): Violation
       ruleType: 'threshold',
       description: 'Too many lines changed',
       severity: 'error',
-      details: `Changed ${diff.totalLinesChanged} lines, maximum allowed is ${rule.max_lines_changed}`
+      details: `Changed ${diff.totalLinesChanged} lines, maximum allowed is ${rule.max_lines_changed}`,
+      lineNumbers: changedLines
     });
   }
 
