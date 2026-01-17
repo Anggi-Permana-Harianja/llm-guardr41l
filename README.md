@@ -4,6 +4,7 @@ A VS Code extension that prevents LLMs from making unsolicited changes to your c
 
 ## Features
 
+### Core Features
 - **Real-time Change Monitoring**: Automatically detects code changes from any source (Copilot, Claude Code, Cursor, ChatGPT pastes, etc.) and validates them against your rules
 - **Rule Configuration**: Define rules in a `rules.yaml` file to control how LLMs can modify your code
 - **Prompt Guardrails**: Automatically inject rule directives into LLM prompts
@@ -12,6 +13,12 @@ A VS Code extension that prevents LLMs from making unsolicited changes to your c
 - **UI Preview**: Visual diff preview with highlighted changes and approval workflow
 - **Auto-Revert**: Automatically revert rejected changes to maintain code integrity
 - **Logging**: Track all LLM interactions and approvals in a JSON log file
+
+### v0.2.0 Features
+- **Inline Diagnostics**: Violations appear as squiggly underlines in the editor and in the Problems panel - no more intrusive popups
+- **Metrics Dashboard**: View approval rates, violation trends, and top violated rules in an interactive dashboard
+- **Project-Aware Defaults**: Auto-scan your project's `package.json`, `.eslintrc`, and `tsconfig.json` to generate smart rules
+- **Learn from Rejections**: The extension tracks rejection patterns and suggests new rules after repeated rejections
 
 ## Installation
 
@@ -58,6 +65,8 @@ Or set them as environment variables:
 | `llm-guardrail.monitorDebounceMs` | `500` | Debounce delay before processing changes |
 | `llm-guardrail.monitorAutoRevert` | `true` | Auto-revert changes when rejected |
 | `llm-guardrail.monitorIgnoredPatterns` | `["*.md", "*.json", ...]` | File patterns to ignore |
+| `llm-guardrail.suggestionThreshold` | `3` | Number of rejections before suggesting a new rule |
+| `llm-guardrail.dashboardPeriodDays` | `30` | Default time period for the metrics dashboard |
 
 ### Rules Configuration
 
@@ -152,6 +161,10 @@ For direct LLM code generation with built-in guardrails:
 | `Guardrail: Approve Current Change` | Approve pending monitored change |
 | `Guardrail: Reject Current Change` | Reject and revert pending change |
 | `Guardrail: Edit Rules` | Open or create rules.yaml |
+| `Guardrail: Generate Rules` | Interactively generate rules from templates |
+| `Guardrail: Scan Project & Generate Rules` | Auto-generate rules from project config |
+| `Guardrail: Show Metrics Dashboard` | View violation statistics and trends |
+| `Guardrail: Show Problems Panel` | Open VS Code Problems panel |
 | `Guardrail: View Logs` | View interaction history |
 
 ## Rule Types
@@ -217,6 +230,45 @@ Limit the scope of changes:
   max_files_changed: 3
   require_approval: true
 ```
+
+## Inline Diagnostics
+
+Violations now appear directly in your editor as squiggly underlines, just like TypeScript or ESLint errors. No more disruptive popups!
+
+- **Error violations** (red squiggles): Forbidden dependencies, forbidden content, scope violations
+- **Warning violations** (yellow squiggles): Unsolicited comments, possible refactoring, threshold warnings
+
+The status bar shows the current violation count. Click on any violation in the Problems panel to jump to the affected line.
+
+## Metrics Dashboard
+
+Run `Guardrail: Show Metrics Dashboard` to view:
+
+- **Summary cards**: Total interactions, violations caught, approval/rejection rates
+- **Trend chart**: Violations over time
+- **Top violated rules**: Most frequently triggered rules
+- **Period selector**: View data for 7, 30, or 90 days
+- **Export**: Download metrics as CSV
+
+## Project Scanner
+
+Run `Guardrail: Scan Project & Generate Rules` to automatically generate rules based on your project configuration:
+
+- **package.json**: Extracts existing dependencies to create an allowed dependencies list
+- **.eslintrc**: Detects ESLint rules like `no-console`, `no-debugger`, `no-eval` and converts them to content rules
+- **tsconfig.json**: Extracts include/exclude patterns for scope rules
+
+This gives you a smart starting point instead of writing rules from scratch.
+
+## Learning from Rejections
+
+The extension tracks patterns in rejected changes. After you reject 3+ changes with similar patterns (configurable via `suggestionThreshold`), it will suggest adding a new rule:
+
+- **Content patterns**: Detects repeated use of `console.log`, `debugger`, etc.
+- **Dependency patterns**: Detects repeated unauthorized imports
+- **Refactoring patterns**: Detects repeated unsolicited error handling or comments
+
+When suggestions are available, you'll see a notification with the option to review and add them to your rules.
 
 ## Logging
 
