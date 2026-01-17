@@ -1,0 +1,178 @@
+{
+  "name": "llm-guardr41l",
+  "displayName": "LLM Guardr41l",
+  "description": "Prevent LLMs from making unsolicited changes to your codebase. Monitor AI-generated code from Copilot, Claude, Cursor, etc. and enforce rules.",
+  "version": "0.1.0",
+  "publisher": "llm-guardr41l",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/prmnaharianja/llm-guardrail"
+  },
+  "license": "MIT",
+  "categories": [
+    "Other",
+    "Machine Learning",
+    "Programming Languages"
+  ],
+  "keywords": [
+    "llm",
+    "guardrail",
+    "ai",
+    "copilot",
+    "claude",
+    "code review",
+    "safety"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "llm-guardrail.generateCode",
+        "title": "Guardrail: Generate Code"
+      },
+      {
+        "command": "llm-guardrail.editRules",
+        "title": "Guardrail: Edit Rules"
+      },
+      {
+        "command": "llm-guardrail.viewLogs",
+        "title": "Guardrail: View Logs"
+      },
+      {
+        "command": "llm-guardrail.toggleMonitor",
+        "title": "Guardrail: Toggle Monitor"
+      },
+      {
+        "command": "llm-guardrail.approveChange",
+        "title": "Guardrail: Approve Current Change"
+      },
+      {
+        "command": "llm-guardrail.rejectChange",
+        "title": "Guardrail: Reject Current Change"
+      },
+      {
+        "command": "llm-guardrail.generateRules",
+        "title": "Guardrail: Generate Rules"
+      }
+    ],
+    "configuration": {
+      "title": "LLM Guardrail",
+      "properties": {
+        "llm-guardrail.provider": {
+          "type": "string",
+          "default": "openai",
+          "enum": [
+            "openai",
+            "anthropic"
+          ],
+          "description": "LLM provider to use"
+        },
+        "llm-guardrail.openaiApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "OpenAI API Key"
+        },
+        "llm-guardrail.anthropicApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Anthropic API Key"
+        },
+        "llm-guardrail.model": {
+          "type": "string",
+          "default": "gpt-4o",
+          "description": "Model to use (e.g., gpt-4o, claude-3-5-sonnet-20241022)"
+        },
+        "llm-guardrail.logPath": {
+          "type": "string",
+          "default": ".llm-guardrail/logs.json",
+          "description": "Path to log file relative to workspace"
+        },
+        "llm-guardrail.monitorEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable automatic monitoring of code changes"
+        },
+        "llm-guardrail.monitorMinLines": {
+          "type": "number",
+          "default": 3,
+          "description": "Minimum number of lines changed to trigger review"
+        },
+        "llm-guardrail.monitorMinChars": {
+          "type": "number",
+          "default": 50,
+          "description": "Minimum number of characters changed to trigger review"
+        },
+        "llm-guardrail.monitorDebounceMs": {
+          "type": "number",
+          "default": 500,
+          "description": "Debounce delay in milliseconds before processing changes"
+        },
+        "llm-guardrail.monitorAutoRevert": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically revert changes when rejected"
+        },
+        "llm-guardrail.monitorIgnoredPatterns": {
+          "type": "array",
+          "default": [
+            "*.md",
+            "*.txt",
+            "*.json",
+            "*.yaml",
+            "*.yml",
+            "*.lock",
+            "*.log"
+          ],
+          "description": "File patterns to ignore when monitoring"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "webpack",
+    "watch": "webpack --watch",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "lint": "eslint src --ext ts,tsx",
+    "test": "jest",
+    "build-webview": "webpack --config webpack.webview.config.js"
+  },
+  "devDependencies": {
+    "@types/diff": "^5.2.1",
+    "@types/jest": "^29.5.12",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.11.0",
+    "@types/react": "^18.2.48",
+    "@types/react-dom": "^18.2.18",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "@vscode/vsce": "^3.7.1",
+    "css-loader": "^6.9.1",
+    "eslint": "^8.56.0",
+    "jest": "^29.7.0",
+    "style-loader": "^3.3.4",
+    "ts-jest": "^29.1.2",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.3.3",
+    "webpack": "^5.89.0",
+    "webpack-cli": "^5.1.4"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "diff": "^5.2.0",
+    "js-yaml": "^4.1.0",
+    "openai": "^4.77.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}

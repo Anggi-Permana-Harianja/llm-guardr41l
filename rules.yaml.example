@@ -1,0 +1,102 @@
+# LLM Guardrail Rules Configuration
+# Copy this file to rules.yaml in your project root and customize
+
+rules:
+  # ===================
+  # SCOPE RULES
+  # ===================
+  # Restrict changes to specific files, functions, or patterns
+
+  - type: scope
+    description: "Only modify the feature module"
+    files:
+      - "src/features/*.ts"
+      - "src/features/*.tsx"
+    functions:
+      - "addFeature"
+      - "updateFeature"
+      - "deleteFeature"
+    # pattern: "class Feature"  # Optional: regex pattern to match
+
+  # ===================
+  # REFACTORING RULES
+  # ===================
+  # Prevent LLMs from making unwanted refactoring changes
+
+  - type: refactor
+    description: "Prevent unwanted code changes"
+    forbid:
+      - variable_renames      # Don't rename existing variables
+      - add_error_handling    # Don't wrap code in try/catch
+      - add_comments          # Don't add comments or documentation
+      - change_formatting     # Don't change whitespace/formatting
+
+  # ===================
+  # DEPENDENCY RULES
+  # ===================
+  # Control which packages/libraries can be imported
+
+  - type: dependencies
+    description: "Control allowed imports"
+    allowed:
+      # List of allowed packages (if set, only these can be imported)
+      - lodash
+      - axios
+      - react
+      - react-dom
+    forbidden:
+      # List of explicitly forbidden packages
+      - moment          # Use date-fns instead
+      - jquery          # Not needed with React
+      - underscore      # Use lodash instead
+
+  # ===================
+  # CONTENT RULES
+  # ===================
+  # Control what content can appear in generated code
+
+  - type: content
+    description: "Content restrictions"
+    require: "use_existing_patterns_only"  # Encourage using existing patterns
+    forbid:
+      # Specific strings that should not appear
+      - console.log
+      - console.debug
+      - debugger
+      - alert
+      - TODO
+      - FIXME
+    patterns:
+      allow:
+        # Regex patterns that are allowed
+        - "^import .* from"
+      deny:
+        # Regex patterns that are forbidden
+        - "eval\\("           # No eval
+        - "Function\\("       # No Function constructor
+        - "innerHTML"         # Use safer alternatives
+        - "document\\.write"  # Don't use document.write
+
+  # ===================
+  # THRESHOLD RULES
+  # ===================
+  # Limit the scope/size of changes
+
+  - type: threshold
+    description: "Limit change size"
+    max_lines_changed: 100    # Maximum lines that can be changed
+    max_files_changed: 5      # Maximum files that can be changed (future feature)
+    require_approval: true    # Always require user approval
+
+# ===================
+# GLOBAL SETTINGS
+# ===================
+global:
+  # Require approval for all changes (even if no violations)
+  require_approval_for_all: true
+
+  # Log all LLM interactions
+  log_all_interactions: true
+
+  # Strict mode: treat warnings as errors
+  strict_mode: false

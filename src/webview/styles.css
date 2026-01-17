@@ -1,0 +1,380 @@
+:root {
+  --vscode-bg: var(--vscode-editor-background, #1e1e1e);
+  --vscode-fg: var(--vscode-editor-foreground, #d4d4d4);
+  --vscode-border: var(--vscode-panel-border, #3c3c3c);
+  --vscode-button-bg: var(--vscode-button-background, #0e639c);
+  --vscode-button-fg: var(--vscode-button-foreground, #ffffff);
+  --vscode-button-hover: var(--vscode-button-hoverBackground, #1177bb);
+  --vscode-error: var(--vscode-errorForeground, #f14c4c);
+  --vscode-warning: var(--vscode-editorWarning-foreground, #cca700);
+  --vscode-success: var(--vscode-terminal-ansiGreen, #23d18b);
+  --added-bg: rgba(35, 134, 54, 0.2);
+  --added-highlight: rgba(35, 134, 54, 0.4);
+  --removed-bg: rgba(218, 54, 51, 0.2);
+  --removed-highlight: rgba(218, 54, 51, 0.4);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+  font-size: var(--vscode-font-size, 13px);
+  background-color: var(--vscode-bg);
+  color: var(--vscode-fg);
+  padding: 16px;
+}
+
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.error-message {
+  padding: 20px;
+  background: var(--removed-bg);
+  border: 1px solid var(--vscode-error);
+  border-radius: 4px;
+  text-align: center;
+}
+
+.diff-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--vscode-border);
+}
+
+.header h2 {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.stats {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.stat {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
+.stat.added {
+  background: var(--added-bg);
+  color: var(--vscode-success);
+}
+
+.stat.removed {
+  background: var(--removed-bg);
+  color: var(--vscode-error);
+}
+
+.stat.total {
+  color: var(--vscode-fg);
+  opacity: 0.8;
+}
+
+.violations {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--vscode-border);
+  border-radius: 4px;
+  padding: 12px;
+}
+
+.violations-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.violations-header h3 {
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.badge {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-weight: normal;
+}
+
+.badge.error {
+  background: var(--removed-bg);
+  color: var(--vscode-error);
+}
+
+.badge.warning {
+  background: rgba(204, 167, 0, 0.2);
+  color: var(--vscode-warning);
+}
+
+.violations-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.violation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.violation.error {
+  background: var(--removed-bg);
+  border-left: 3px solid var(--vscode-error);
+}
+
+.violation.warning {
+  background: rgba(204, 167, 0, 0.1);
+  border-left: 3px solid var(--vscode-warning);
+}
+
+.violation-type {
+  font-family: monospace;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.violation-desc {
+  font-weight: 500;
+}
+
+.violation-details {
+  width: 100%;
+  font-size: 11px;
+  opacity: 0.8;
+  font-style: italic;
+}
+
+.warning-banner {
+  background: rgba(204, 167, 0, 0.2);
+  border: 1px solid var(--vscode-warning);
+  border-radius: 4px;
+  padding: 12px;
+  font-size: 13px;
+}
+
+.view-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.view-button {
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid var(--vscode-border);
+  color: var(--vscode-fg);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.view-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.view-button.active {
+  background: var(--vscode-button-bg);
+  border-color: var(--vscode-button-bg);
+  color: var(--vscode-button-fg);
+}
+
+.diff-container {
+  border: 1px solid var(--vscode-border);
+  border-radius: 4px;
+  overflow: hidden;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.diff-split {
+  display: flex;
+}
+
+.diff-panel {
+  flex: 1;
+  min-width: 0;
+}
+
+.diff-panel.original {
+  border-right: 1px solid var(--vscode-border);
+}
+
+.diff-panel-header {
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid var(--vscode-border);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.diff-content {
+  font-family: var(--vscode-editor-font-family, 'Fira Code', Consolas, monospace);
+  font-size: var(--vscode-editor-font-size, 12px);
+  line-height: 1.5;
+}
+
+.diff-line {
+  display: flex;
+  min-height: 20px;
+}
+
+.diff-line.empty {
+  background: rgba(128, 128, 128, 0.1);
+}
+
+.diff-line.added {
+  background: var(--added-bg);
+}
+
+.diff-line.removed {
+  background: var(--removed-bg);
+}
+
+.line-number {
+  min-width: 40px;
+  padding: 0 8px;
+  text-align: right;
+  color: var(--vscode-fg);
+  opacity: 0.5;
+  user-select: none;
+  border-right: 1px solid var(--vscode-border);
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.line-prefix {
+  width: 20px;
+  text-align: center;
+  font-weight: bold;
+  user-select: none;
+}
+
+.diff-line.added .line-prefix {
+  color: var(--vscode-success);
+}
+
+.diff-line.removed .line-prefix {
+  color: var(--vscode-error);
+}
+
+.line-content {
+  flex: 1;
+  padding: 0 8px;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.diff-unified {
+  width: 100%;
+}
+
+.diff-unified .diff-line {
+  display: flex;
+}
+
+.diff-unified .line-number {
+  min-width: 35px;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--vscode-border);
+}
+
+.action-button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.action-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.action-button.approve {
+  background: var(--vscode-success);
+  color: #000;
+}
+
+.action-button.approve:hover:not(:disabled) {
+  background: #1eb87a;
+}
+
+.action-button.reject {
+  background: var(--vscode-error);
+  color: #fff;
+}
+
+.action-button.reject:hover {
+  opacity: 0.9;
+}
+
+.action-button.edit-rules {
+  background: transparent;
+  border: 1px solid var(--vscode-border);
+  color: var(--vscode-fg);
+}
+
+.action-button.edit-rules:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.approval-blocked {
+  padding: 12px;
+  background: var(--removed-bg);
+  border: 1px solid var(--vscode-error);
+  border-radius: 4px;
+  font-size: 12px;
+  text-align: center;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--vscode-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--vscode-border);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
