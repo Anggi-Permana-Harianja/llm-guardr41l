@@ -2,16 +2,12 @@
   "name": "llm-guardr41l",
   "displayName": "LLM Guardr41l",
   "description": "Prevent LLMs from making unsolicited changes to your codebase. Monitor AI-generated code from Copilot, Claude, Cursor, etc. and enforce rules.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "llm-guardr41l",
   "engines": {
     "vscode": "^1.85.0"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/prmnaharianja/llm-guardrail"
-  },
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "categories": [
     "Other",
     "Machine Learning",

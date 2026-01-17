@@ -15,19 +15,17 @@ A VS Code extension that prevents LLMs from making unsolicited changes to your c
 
 ## Installation
 
-1. Clone or download this repository
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Build the extension:
-   ```bash
-   npm run compile
-   ```
-4. For development, you can also build the webview separately:
-   ```bash
-   npm run build-webview
-   ```
+**From VS Code Marketplace (Recommended):**
+1. Open VS Code
+2. Go to Extensions (Cmd+Shift+X or Ctrl+Shift+X)
+3. Search for "LLM Guardr41l"
+4. Click Install
+
+**From VSIX file:**
+1. Download the `.vsix` file
+2. In VS Code, go to Extensions
+3. Click the `...` menu → "Install from VSIX..."
+4. Select the downloaded file
 
 ## Configuration
 
@@ -219,64 +217,6 @@ Limit the scope of changes:
   max_files_changed: 3
   require_approval: true
 ```
-
-## Development
-
-### Project Structure
-
-```
-llm-guardrail/
-├── src/
-│   ├── extension.ts       # Extension entry point
-│   ├── change-monitor.ts  # Real-time change detection
-│   ├── rules.ts           # Rule configuration and parsing
-│   ├── llm-proxy.ts       # LLM API wrapper
-│   ├── diff-validator.ts  # Diff computation and validation
-│   ├── logger.ts          # Logging system
-│   └── webview/           # React UI components
-│       ├── index.tsx
-│       ├── DiffPreview.tsx
-│       └── styles.css
-├── test/
-│   ├── __mocks__/
-│   │   └── vscode.ts
-│   ├── rules.test.ts
-│   └── diff-validator.test.ts
-├── package.json
-├── tsconfig.json
-├── webpack.config.js
-├── webpack.webview.config.js
-└── README.md
-```
-
-### Commands
-
-```bash
-# Install dependencies
-npm install
-
-# Compile extension
-npm run compile
-
-# Watch mode
-npm run watch
-
-# Build webview
-npm run build-webview
-
-# Run tests
-npm test
-
-# Package extension
-npm run package
-```
-
-### Running in Development
-
-1. Open the project in VS Code
-2. Press F5 to launch the Extension Development Host
-3. In the new VS Code window, open a project with code files
-4. Run the "Guardrail: Generate Code" command
 
 ## Logging
 
