@@ -2,7 +2,7 @@
   "name": "llm-guardr41l",
   "displayName": "LLM Guardr41l",
   "description": "Prevent LLMs from making unsolicited changes to your codebase. Monitor AI-generated code from Copilot, Claude, Cursor, etc. and enforce rules.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "llm-guardr41l",
   "engines": {
     "vscode": "^1.85.0"
@@ -68,6 +68,14 @@
       {
         "command": "llm-guardrail.showProblemsPanel",
         "title": "Guardrail: Show Problems Panel"
+      },
+      {
+        "command": "llm-guardrail.undoRejection",
+        "title": "Guardrail: Undo Last Rejection"
+      },
+      {
+        "command": "llm-guardrail.createOverride",
+        "title": "Guardrail: Create Local Override File"
       }
     ],
     "configuration": {

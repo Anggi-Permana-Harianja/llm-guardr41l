@@ -1,6 +1,8 @@
 # LLM Guardr41l
 
-A VS Code extension that prevents LLMs from making unsolicited changes to your codebase by enforcing user-defined rules, injecting guardrails into prompts, validating outputs with diffs, and requiring approvals for changes.
+A VS Code extension that prevents LLMs from making unsolicited changes to your codebase by enforcing user-defined rules, validating outputs with diffs, and requiring approvals for changes.
+
+> **No API key required!** LLM Guardr41l monitors code changes from any source - GitHub Copilot, Claude, Cursor, ChatGPT pastes, or any other AI tool. It works by watching your editor for changes, not by intercepting API calls. API keys are only needed for the optional "Generate Code" feature.
 
 ## Features
 
@@ -19,6 +21,11 @@ A VS Code extension that prevents LLMs from making unsolicited changes to your c
 - **Metrics Dashboard**: View approval rates, violation trends, and top violated rules in an interactive dashboard
 - **Project-Aware Defaults**: Auto-scan your project's `package.json`, `.eslintrc`, and `tsconfig.json` to generate smart rules
 - **Learn from Rejections**: The extension tracks rejection patterns and suggests new rules after repeated rejections
+
+### v0.3.0 Features
+- **Quick Fix Actions**: Click the lightbulb on any violation to add dependencies to allowlist, remove from forbidden list, adjust thresholds, or dismiss violations
+- **Per-folder Rule Overrides**: Create `.llm-guardrail.yaml` files in subdirectories to extend, replace, or disable rules for specific parts of your codebase
+- **Undo Rejection**: Accidentally rejected a change? Use `Guardrail: Undo Last Rejection` to restore it
 
 ## Installation
 
@@ -160,8 +167,10 @@ For direct LLM code generation with built-in guardrails:
 | `Guardrail: Toggle Monitor` | Enable/disable automatic change monitoring |
 | `Guardrail: Approve Current Change` | Approve pending monitored change |
 | `Guardrail: Reject Current Change` | Reject and revert pending change |
+| `Guardrail: Undo Last Rejection` | Restore the most recently rejected change |
 | `Guardrail: Edit Rules` | Open or create rules.yaml |
 | `Guardrail: Generate Rules` | Interactively generate rules from templates |
+| `Guardrail: Create Local Override File` | Create a `.llm-guardrail.yaml` override in current folder |
 | `Guardrail: Scan Project & Generate Rules` | Auto-generate rules from project config |
 | `Guardrail: Show Metrics Dashboard` | View violation statistics and trends |
 | `Guardrail: Show Problems Panel` | Open VS Code Problems panel |
@@ -269,6 +278,51 @@ The extension tracks patterns in rejected changes. After you reject 3+ changes w
 - **Refactoring patterns**: Detects repeated unsolicited error handling or comments
 
 When suggestions are available, you'll see a notification with the option to review and add them to your rules.
+
+## Quick Fix Actions
+
+When a violation is detected, click the lightbulb icon (or press `Cmd+.` / `Ctrl+.`) to see available quick fixes:
+
+- **Dependency violations**: "Add X to allowed dependencies" or "Remove X from forbidden list"
+- **Content violations**: "Allow X in content rules"
+- **Refactor violations**: "Allow variable_renames in refactor rules"
+- **Scope violations**: "Add filename.ts to allowed files"
+- **Threshold violations**: "Increase max_lines_changed to N"
+- **All violations**: "Dismiss this violation" (for this session only)
+
+Quick fixes automatically update your `rules.yaml` file.
+
+## Per-folder Rule Overrides
+
+Create `.llm-guardrail.yaml` files in subdirectories to customize rules for specific parts of your codebase. Override files are applied hierarchically from the workspace root to the file's directory.
+
+```yaml
+# .llm-guardrail.yaml in src/tests/
+# Allow console.log in test files
+
+# Set to true to completely replace parent rules (default: false = merge)
+replace: false
+
+# Disable specific rules by type or description keyword
+disable:
+  - content           # Disable all content rules in this folder
+
+# Additional rules for this directory
+rules:
+  - type: content
+    description: "Test-specific content rules"
+    forbid: []        # Allow everything
+
+# Override global settings
+global:
+  require_approval_for_all: false
+```
+
+Use `Guardrail: Create Local Override File` to generate a template in the current folder.
+
+## Undo Rejection
+
+If you accidentally reject a change, use `Guardrail: Undo Last Rejection` to restore it. The extension keeps a history of the last 10 rejections, so you can recover recent changes even if you've made other edits since.
 
 ## Logging
 

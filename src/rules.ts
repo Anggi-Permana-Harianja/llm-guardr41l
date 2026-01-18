@@ -108,6 +108,199 @@ export async function loadRules(): Promise<RulesConfig> {
   }
 }
 
+/**
+ * Load rules with per-folder overrides for a specific file.
+ * Searches for .llm-guardrail.yaml files from the file's directory up to workspace root.
+ * Override files can extend or replace parent rules.
+ */
+export async function loadRulesForFile(filePath: string): Promise<RulesConfig> {
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (!workspaceFolders || workspaceFolders.length === 0) {
+    return loadRules();
+  }
+
+  const workspaceRoot = workspaceFolders[0].uri.fsPath;
+
+  // Start with base rules
+  let baseRules = await loadRules();
+
+  // Find all .llm-guardrail.yaml files from workspace root to file's directory
+  const fileDir = path.dirname(filePath);
+  const overrideFiles = findOverrideFiles(workspaceRoot, fileDir);
+
+  // Apply overrides in order (from root to most specific)
+  for (const overridePath of overrideFiles) {
+    try {
+      const overrideContent = fs.readFileSync(overridePath, 'utf8');
+      const override = yaml.load(overrideContent) as RulesOverride;
+
+      if (override) {
+        baseRules = applyRulesOverride(baseRules, override);
+      }
+    } catch (error) {
+      console.error(`Failed to load override file ${overridePath}:`, error);
+    }
+  }
+
+  return baseRules;
+}
+
+/**
+ * Override configuration for .llm-guardrail.yaml files
+ */
+export interface RulesOverride {
+  // If true, completely replace parent rules instead of merging
+  replace?: boolean;
+
+  // Rules to add (merged with parent)
+  rules?: Rule[];
+
+  // Rules to disable by type or description
+  disable?: string[];
+
+  // Global overrides
+  global?: RulesConfig['global'];
+}
+
+/**
+ * Find all .llm-guardrail.yaml files from root to target directory
+ */
+function findOverrideFiles(workspaceRoot: string, targetDir: string): string[] {
+  const overrideFiles: string[] = [];
+  const overrideFileName = '.llm-guardrail.yaml';
+
+  // Normalize paths
+  const normalizedRoot = path.normalize(workspaceRoot);
+  let currentDir = path.normalize(targetDir);
+
+  // Collect directories from target to root
+  const directories: string[] = [];
+  while (currentDir.startsWith(normalizedRoot) && currentDir.length >= normalizedRoot.length) {
+    directories.unshift(currentDir); // Add to front so root comes first
+    const parent = path.dirname(currentDir);
+    if (parent === currentDir) {
+      break; // Reached filesystem root
+    }
+    currentDir = parent;
+  }
+
+  // Check each directory for override file
+  for (const dir of directories) {
+    const overridePath = path.join(dir, overrideFileName);
+    if (fs.existsSync(overridePath)) {
+      overrideFiles.push(overridePath);
+    }
+  }
+
+  return overrideFiles;
+}
+
+/**
+ * Apply an override to base rules
+ */
+function applyRulesOverride(base: RulesConfig, override: RulesOverride): RulesConfig {
+  // If replace mode, start fresh with just override rules
+  if (override.replace) {
+    return {
+      rules: override.rules || [],
+      global: {
+        ...DEFAULT_RULES.global,
+        ...(override.global || {})
+      }
+    };
+  }
+
+  // Merge mode: combine rules
+  let mergedRules = [...base.rules];
+
+  // Remove disabled rules
+  if (override.disable && override.disable.length > 0) {
+    mergedRules = mergedRules.filter(rule => {
+      // Check if rule type or description matches any disable pattern
+      const typeMatch = override.disable!.includes(rule.type);
+      const descMatch = rule.description && override.disable!.some(d =>
+        rule.description?.toLowerCase().includes(d.toLowerCase())
+      );
+      return !typeMatch && !descMatch;
+    });
+  }
+
+  // Add new rules from override
+  if (override.rules && override.rules.length > 0) {
+    mergedRules = [...mergedRules, ...override.rules];
+  }
+
+  return {
+    rules: mergedRules,
+    global: {
+      ...base.global,
+      ...(override.global || {})
+    }
+  };
+}
+
+/**
+ * Create a .llm-guardrail.yaml override file in current directory
+ */
+export async function createOverrideFile(directory?: string): Promise<void> {
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (!workspaceFolders || workspaceFolders.length === 0) {
+    vscode.window.showErrorMessage('No workspace folder open.');
+    return;
+  }
+
+  // Use provided directory or prompt for one
+  let targetDir = directory;
+  if (!targetDir) {
+    const activeEditor = vscode.window.activeTextEditor;
+    if (activeEditor) {
+      targetDir = path.dirname(activeEditor.document.uri.fsPath);
+    } else {
+      targetDir = workspaceFolders[0].uri.fsPath;
+    }
+  }
+
+  const overridePath = path.join(targetDir, '.llm-guardrail.yaml');
+
+  if (fs.existsSync(overridePath)) {
+    const doc = await vscode.workspace.openTextDocument(overridePath);
+    await vscode.window.showTextDocument(doc);
+    return;
+  }
+
+  const content = `# LLM Guardrail - Local Override
+# This file overrides rules from parent directories for files in this folder and subfolders
+
+# Set to true to completely replace parent rules (default: false = merge)
+replace: false
+
+# Disable specific rules by type or description keyword
+disable: []
+  # - refactor           # Disable all refactor rules
+  # - "console.log"      # Disable rules mentioning console.log
+
+# Additional rules for this directory
+rules: []
+  # - type: content
+  #   description: "Allow console.log in this folder"
+  #   forbid: []
+
+# Override global settings
+# global:
+#   require_approval_for_all: false
+`;
+
+  try {
+    fs.writeFileSync(overridePath, content, 'utf8');
+    const doc = await vscode.workspace.openTextDocument(overridePath);
+    await vscode.window.showTextDocument(doc);
+    vscode.window.showInformationMessage('Created .llm-guardrail.yaml override file.');
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    vscode.window.showErrorMessage(`Failed to create override file: ${errorMessage}`);
+  }
+}
+
 export function generatePromptDirectives(rules: RulesConfig): string {
   if (rules.rules.length === 0) {
     return '';

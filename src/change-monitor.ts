@@ -23,6 +23,17 @@ export interface MonitorConfig {
 
 type PendingChangeHandler = (event: ChangeEvent, validation: ValidationResult) => void;
 
+/**
+ * Stores a rejected change for potential undo
+ */
+export interface RejectedChange {
+  documentUri: string;
+  originalContent: string;
+  rejectedContent: string;
+  timestamp: number;
+  fileName: string;
+}
+
 export class ChangeMonitor {
   private disposables: vscode.Disposable[] = [];
   private documentSnapshots: Map<string, string> = new Map();
@@ -33,6 +44,10 @@ export class ChangeMonitor {
   private onPendingChange: PendingChangeHandler | null = null;
   private isProcessing: Set<string> = new Set();
   private statusBarItem: vscode.StatusBarItem;
+  // Store last rejected changes for undo (keyed by document URI)
+  private rejectedChanges: Map<string, RejectedChange> = new Map();
+  // Global stack of recent rejections for quick undo
+  private rejectionHistory: RejectedChange[] = [];
 
   constructor() {
     this.config = this.loadConfig();
@@ -204,6 +219,24 @@ export class ChangeMonitor {
 
     if (change && this.config.autoRevertOnReject) {
       const originalContent = change.originalContent;
+      const rejectedContent = change.newContent;
+
+      // Store the rejected change for potential undo
+      const rejectedChange: RejectedChange = {
+        documentUri,
+        originalContent,
+        rejectedContent,
+        timestamp: Date.now(),
+        fileName: change.document.fileName.split('/').pop() || 'unknown'
+      };
+      this.rejectedChanges.set(documentUri, rejectedChange);
+      this.rejectionHistory.unshift(rejectedChange);
+
+      // Keep only last 10 rejections in history
+      if (this.rejectionHistory.length > 10) {
+        this.rejectionHistory.pop();
+      }
+
       this.pendingChanges.delete(documentUri);
       this.isProcessing.delete(documentUri);
 
@@ -235,6 +268,106 @@ export class ChangeMonitor {
       this.pendingChanges.delete(documentUri);
       this.isProcessing.delete(documentUri);
     }
+  }
+
+  /**
+   * Undo the last rejection for a specific document
+   */
+  public async undoRejection(documentUri: string): Promise<boolean> {
+    const rejectedChange = this.rejectedChanges.get(documentUri);
+
+    if (!rejectedChange) {
+      return false;
+    }
+
+    // Find the editor
+    const editor = vscode.window.visibleTextEditors.find(
+      e => e.document.uri.toString() === documentUri
+    );
+
+    if (!editor) {
+      // Try to open the document
+      try {
+        const doc = await vscode.workspace.openTextDocument(vscode.Uri.parse(documentUri));
+        await vscode.window.showTextDocument(doc);
+      } catch {
+        return false;
+      }
+    }
+
+    const activeEditor = vscode.window.activeTextEditor;
+    if (!activeEditor || activeEditor.document.uri.toString() !== documentUri) {
+      return false;
+    }
+
+    // Temporarily disable monitoring
+    const wasEnabled = this.config.enabled;
+    this.config.enabled = false;
+
+    // Restore the rejected content
+    await activeEditor.edit(editBuilder => {
+      const fullRange = new vscode.Range(
+        activeEditor.document.positionAt(0),
+        activeEditor.document.positionAt(activeEditor.document.getText().length)
+      );
+      editBuilder.replace(fullRange, rejectedChange.rejectedContent);
+    });
+
+    // Re-enable monitoring
+    this.config.enabled = wasEnabled;
+
+    // Update snapshot to the restored content
+    this.documentSnapshots.set(documentUri, rejectedChange.rejectedContent);
+
+    // Remove from rejected changes
+    this.rejectedChanges.delete(documentUri);
+    this.rejectionHistory = this.rejectionHistory.filter(r => r.documentUri !== documentUri);
+
+    return true;
+  }
+
+  /**
+   * Undo the most recent rejection across all documents
+   */
+  public async undoLastRejection(): Promise<boolean> {
+    if (this.rejectionHistory.length === 0) {
+      return false;
+    }
+
+    const lastRejection = this.rejectionHistory[0];
+    return this.undoRejection(lastRejection.documentUri);
+  }
+
+  /**
+   * Get the last rejected change for a document
+   */
+  public getLastRejectedChange(documentUri: string): RejectedChange | undefined {
+    return this.rejectedChanges.get(documentUri);
+  }
+
+  /**
+   * Get recent rejection history
+   */
+  public getRejectionHistory(): RejectedChange[] {
+    return [...this.rejectionHistory];
+  }
+
+  /**
+   * Check if there's a rejection that can be undone
+   */
+  public canUndoRejection(documentUri?: string): boolean {
+    if (documentUri) {
+      return this.rejectedChanges.has(documentUri);
+    }
+    return this.rejectionHistory.length > 0;
+  }
+
+  /**
+   * Clear rejection history
+   */
+  public clearRejectionHistory(): void {
+    this.rejectedChanges.clear();
+    this.rejectionHistory = [];
   }
 
   public getPendingChange(documentUri: string): ChangeEvent | undefined {

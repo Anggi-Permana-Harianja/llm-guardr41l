@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { loadRules, createDefaultRulesFile, getRulesFilePath, generateRulesInteractive, rulesFileExists } from './rules';
+import { loadRules, createDefaultRulesFile, getRulesFilePath, generateRulesInteractive, rulesFileExists, createOverrideFile } from './rules';
 import { generateCode, isConfigured, getCurrentProvider, getCurrentModel } from './llm-proxy';
 import { validateAgainstRules, ValidationResult } from './diff-validator';
 import { logGeneration, logApproval, logRejection, logError, showLogsInEditor, getRecentLogs } from './logger';
@@ -9,6 +9,7 @@ import { getChangeMonitor, disposeChangeMonitor, ChangeEvent } from './change-mo
 import { disposeDiagnosticsManager } from './diagnostics-manager';
 import { MetricsCalculator } from './metrics-calculator';
 import { scanProjectInteractive } from './project-scanner';
+import { GuardrailQuickFixProvider, registerQuickFixCommands } from './quick-fix-provider';
 
 let currentPanel: vscode.WebviewPanel | undefined;
 let dashboardPanel: vscode.WebviewPanel | undefined;
@@ -119,6 +120,49 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
+  // Register undo rejection command
+  const undoRejectionCommand = vscode.commands.registerCommand(
+    'llm-guardrail.undoRejection',
+    async () => {
+      const success = await monitor.undoLastRejection();
+      if (success) {
+        vscode.window.showInformationMessage('Rejection undone. Changes restored.');
+      } else {
+        vscode.window.showWarningMessage('No rejection to undo.');
+      }
+    }
+  );
+
+  // Register create override file command
+  const createOverrideCommand = vscode.commands.registerCommand(
+    'llm-guardrail.createOverride',
+    async () => {
+      await createOverrideFile();
+    }
+  );
+
+  // Register reload rules command (used by quick fixes)
+  const reloadRulesCommand = vscode.commands.registerCommand(
+    'llm-guardrail.reloadRules',
+    async () => {
+      // Reload rules in the monitor
+      await monitor.start();
+      vscode.window.showInformationMessage('Rules reloaded.');
+    }
+  );
+
+  // Register Quick Fix provider for code actions
+  const quickFixProvider = vscode.languages.registerCodeActionsProvider(
+    { scheme: 'file' },
+    new GuardrailQuickFixProvider(),
+    {
+      providedCodeActionKinds: GuardrailQuickFixProvider.providedCodeActionKinds
+    }
+  );
+
+  // Register quick fix commands
+  registerQuickFixCommands(context);
+
   context.subscriptions.push(
     generateCodeCommand,
     editRulesCommand,
@@ -129,7 +173,11 @@ export function activate(context: vscode.ExtensionContext) {
     generateRulesCommand,
     showProblemsCommand,
     showDashboardCommand,
-    scanProjectCommand
+    scanProjectCommand,
+    undoRejectionCommand,
+    createOverrideCommand,
+    reloadRulesCommand,
+    quickFixProvider
   );
 
   // Auto-detect missing rules.yaml and prompt user
