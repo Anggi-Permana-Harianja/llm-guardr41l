@@ -114,7 +114,7 @@ export async function check(options: CheckOptions): Promise<number> {
               driver: {
                 name: 'llm-guardrail',
                 version: '0.5.0',
-                informationUri: 'https://github.com/AE-Hertz/llm-guardr41l'
+                informationUri: 'https://github.com/Anggi-Permana-Harianja/llm-guardr41l'
               }
             },
             results: allViolations.map((v, index) => ({

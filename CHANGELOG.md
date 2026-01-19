@@ -121,9 +121,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - CSV export support
   - Tracks all interactions and violations
 
-[0.5.0]: https://github.com/AE-Hertz/llm-guardr41l/compare/v0.4.0...v0.5.0
-[0.4.0]: https://github.com/AE-Hertz/llm-guardr41l/compare/v0.3.0...v0.4.0
-[0.3.0]: https://github.com/AE-Hertz/llm-guardr41l/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/AE-Hertz/llm-guardr41l/compare/v0.1.3...v0.2.0
-[0.1.3]: https://github.com/AE-Hertz/llm-guardr41l/compare/v0.1.0...v0.1.3
-[0.1.0]: https://github.com/AE-Hertz/llm-guardr41l/releases/tag/v0.1.0
+[0.5.0]: https://github.com/Anggi-Permana-Harianja/llm-guardr41l/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/Anggi-Permana-Harianja/llm-guardr41l/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/Anggi-Permana-Harianja/llm-guardr41l/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/Anggi-Permana-Harianja/llm-guardr41l/compare/v0.1.3...v0.2.0
+[0.1.3]: https://github.com/Anggi-Permana-Harianja/llm-guardr41l/compare/v0.1.0...v0.1.3
+[0.1.0]: https://github.com/Anggi-Permana-Harianja/llm-guardr41l/releases/tag/v0.1.0

@@ -16,12 +16,12 @@
   "icon": "icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/AE-Hertz/llm-guardr41l"
+    "url": "https://github.com/Anggi-Permana-Harianja/llm-guardr41l"
   },
   "bugs": {
-    "url": "https://github.com/AE-Hertz/llm-guardr41l/issues"
+    "url": "https://github.com/Anggi-Permana-Harianja/llm-guardr41l/issues"
   },
-  "homepage": "https://github.com/AE-Hertz/llm-guardr41l#readme",
+  "homepage": "https://github.com/Anggi-Permana-Harianja/llm-guardr41l#readme",
   "categories": [
     "Other",
     "Machine Learning",

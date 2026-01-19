@@ -215,7 +215,7 @@ describe('DiffValidator', () => {
 
 ## Reporting Bugs
 
-Use the [Bug Report template](https://github.com/AE-Hertz/llm-guardr41l/issues/new?template=bug_report.md) and include:
+Use the [Bug Report template](https://github.com/Anggi-Permana-Harianja/llm-guardr41l/issues/new?template=bug_report.md) and include:
 
 - VS Code version
 - Extension version
@@ -226,7 +226,7 @@ Use the [Bug Report template](https://github.com/AE-Hertz/llm-guardr41l/issues/n
 
 ## Suggesting Features
 
-Use the [Feature Request template](https://github.com/AE-Hertz/llm-guardr41l/issues/new?template=feature_request.md) and include:
+Use the [Feature Request template](https://github.com/Anggi-Permana-Harianja/llm-guardr41l/issues/new?template=feature_request.md) and include:
 
 - Clear description of the feature
 - Use case / problem it solves
@@ -234,11 +234,11 @@ Use the [Feature Request template](https://github.com/AE-Hertz/llm-guardr41l/iss
 
 ## Good First Issues
 
-Looking for something to work on? Check out issues labeled [`good first issue`](https://github.com/AE-Hertz/llm-guardr41l/labels/good%20first%20issue).
+Looking for something to work on? Check out issues labeled [`good first issue`](https://github.com/Anggi-Permana-Harianja/llm-guardr41l/labels/good%20first%20issue).
 
 ## Questions?
 
-- Open a [Discussion](https://github.com/AE-Hertz/llm-guardr41l/discussions) for general questions
+- Open a [Discussion](https://github.com/Anggi-Permana-Harianja/llm-guardr41l/discussions) for general questions
 - Check existing issues before opening new ones
 
 ---

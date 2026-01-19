@@ -135,7 +135,7 @@ export function formatSarif(result: ValidationResult, options: FormatterOptions 
           driver: {
             name: 'llm-guardrail',
             version: '0.5.0',
-            informationUri: 'https://github.com/AE-Hertz/llm-guardr41l',
+            informationUri: 'https://github.com/Anggi-Permana-Harianja/llm-guardr41l',
             rules: getUniqueRules(result.violations)
           }
         },

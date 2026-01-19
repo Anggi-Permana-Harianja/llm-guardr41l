@@ -7,7 +7,7 @@
 [![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/llm-guardr41l.llm-guardr41l?label=VS%20Code%20Marketplace&logo=visualstudiocode&color=blue)](https://marketplace.visualstudio.com/items?itemName=llm-guardr41l.llm-guardr41l)
 [![Installs](https://img.shields.io/visual-studio-marketplace/i/llm-guardr41l.llm-guardr41l?logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=llm-guardr41l.llm-guardr41l)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![CI](https://github.com/AE-Hertz/llm-guardr41l/actions/workflows/ci.yml/badge.svg)](https://github.com/AE-Hertz/llm-guardr41l/actions/workflows/ci.yml)
+[![CI](https://github.com/Anggi-Permana-Harianja/llm-guardr41l/actions/workflows/ci.yml/badge.svg)](https://github.com/Anggi-Permana-Harianja/llm-guardr41l/actions/workflows/ci.yml)
 
 [Install from Marketplace](https://marketplace.visualstudio.com/items?itemName=llm-guardr41l.llm-guardr41l) · [Documentation](#usage) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
 
@@ -114,7 +114,7 @@ global:
 
 **From Source:**
 ```bash
-git clone https://github.com/AE-Hertz/llm-guardr41l.git
+git clone https://github.com/Anggi-Permana-Harianja/llm-guardr41l.git
 cd llm-guardr41l
 npm install
 npm run package
@@ -576,7 +576,7 @@ For security issues, please see [SECURITY.md](SECURITY.md).
 
 <div align="center">
 
-**[Star us on GitHub](https://github.com/AE-Hertz/llm-guardr41l)** — it helps others discover the project!
+**[Star us on GitHub](https://github.com/Anggi-Permana-Harianja/llm-guardr41l)** — it helps others discover the project!
 
 Made with care for the AI-assisted coding era.
 
