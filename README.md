@@ -1,8 +1,76 @@
+<div align="center">
+
 # LLM Guardr41l
 
-A VS Code extension that prevents LLMs from making unsolicited changes to your codebase by enforcing user-defined rules, validating outputs with diffs, and requiring approvals for changes.
+**Stop AI coding assistants from breaking your code.**
 
-> **No API key required!** LLM Guardr41l monitors code changes from any source - GitHub Copilot, Claude, Cursor, ChatGPT pastes, or any other AI tool. It works by watching your editor for changes, not by intercepting API calls. API keys are only needed for the optional "Generate Code" feature.
+[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/llm-guardr41l.llm-guardr41l?label=VS%20Code%20Marketplace&logo=visualstudiocode&color=blue)](https://marketplace.visualstudio.com/items?itemName=llm-guardr41l.llm-guardr41l)
+[![Installs](https://img.shields.io/visual-studio-marketplace/i/llm-guardr41l.llm-guardr41l?logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=llm-guardr41l.llm-guardr41l)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/AE-Hertz/llm-guardr41l/actions/workflows/ci.yml/badge.svg)](https://github.com/AE-Hertz/llm-guardr41l/actions/workflows/ci.yml)
+
+[Install from Marketplace](https://marketplace.visualstudio.com/items?itemName=llm-guardr41l.llm-guardr41l) · [Documentation](#usage) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
+
+</div>
+
+---
+
+## The Problem
+
+AI coding assistants are powerful — but unpredictable. Copilot adds `console.log` everywhere. Claude refactors your variable names. Cursor imports packages you've banned. Autonomous agents rewrite entire files.
+
+**LLM Guardr41l acts as a bouncer for your code.** Define rules once, enforce them automatically on every AI-generated change.
+
+> **No API key required!** LLM Guardr41l monitors code changes from any source — GitHub Copilot, Claude, Cursor, ChatGPT pastes, or any other AI tool. It works by watching your editor for changes, not by intercepting API calls. API keys are only needed for the optional "Generate Code" feature.
+
+<!--
+## Demo
+
+TODO: Add GIFs here
+![Rule violation detected](docs/assets/violation-demo.gif)
+-->
+
+## Quick Start
+
+**1. Install the extension**
+
+```
+ext install llm-guardr41l.llm-guardr41l
+```
+
+Or search "LLM Guardr41l" in VS Code Extensions.
+
+**2. Create `rules.yaml` in your project root**
+
+```yaml
+rules:
+  # Don't let AI add random npm packages
+  - type: dependencies
+    allowed:
+      - react
+      - lodash
+      - axios
+    forbidden:
+      - moment  # Use date-fns instead
+
+  # No debugging artifacts in production code
+  - type: content
+    forbid:
+      - console.log
+      - debugger
+
+  # Limit blast radius
+  - type: threshold
+    max_lines_changed: 100
+    max_files_changed: 5
+
+global:
+  require_approval_for_all: true
+```
+
+**3. That's it.** LLM Guardr41l now monitors all code changes and enforces your rules.
+
+---
 
 ## Features
 
@@ -17,7 +85,7 @@ A VS Code extension that prevents LLMs from making unsolicited changes to your c
 - **Logging**: Track all LLM interactions and approvals in a JSON log file
 
 ### v0.2.0 Features
-- **Inline Diagnostics**: Violations appear as squiggly underlines in the editor and in the Problems panel - no more intrusive popups
+- **Inline Diagnostics**: Violations appear as squiggly underlines in the editor and in the Problems panel — no more intrusive popups
 - **Metrics Dashboard**: View approval rates, violation trends, and top violated rules in an interactive dashboard
 - **Project-Aware Defaults**: Auto-scan your project's `package.json`, `.eslintrc`, and `tsconfig.json` to generate smart rules
 - **Learn from Rejections**: The extension tracks rejection patterns and suggests new rules after repeated rejections
@@ -27,6 +95,8 @@ A VS Code extension that prevents LLMs from making unsolicited changes to your c
 - **Per-folder Rule Overrides**: Create `.llm-guardrail.yaml` files in subdirectories to extend, replace, or disable rules for specific parts of your codebase
 - **Undo Rejection**: Accidentally rejected a change? Use `Guardrail: Undo Last Rejection` to restore it
 
+---
+
 ## Installation
 
 **From VS Code Marketplace (Recommended):**
@@ -35,11 +105,16 @@ A VS Code extension that prevents LLMs from making unsolicited changes to your c
 3. Search for "LLM Guardr41l"
 4. Click Install
 
-**From VSIX file:**
-1. Download the `.vsix` file
-2. In VS Code, go to Extensions
-3. Click the `...` menu → "Install from VSIX..."
-4. Select the downloaded file
+**From Source:**
+```bash
+git clone https://github.com/AE-Hertz/llm-guardr41l.git
+cd llm-guardr41l
+npm install
+npm run package
+# Install the generated .vsix file via Extensions > ... > Install from VSIX
+```
+
+---
 
 ## Configuration
 
@@ -130,6 +205,8 @@ global:
   strict_mode: false
 ```
 
+---
+
 ## Usage
 
 ### Automatic Change Monitoring (Recommended)
@@ -175,6 +252,8 @@ For direct LLM code generation with built-in guardrails:
 | `Guardrail: Show Metrics Dashboard` | View violation statistics and trends |
 | `Guardrail: Show Problems Panel` | Open VS Code Problems panel |
 | `Guardrail: View Logs` | View interaction history |
+
+---
 
 ## Rule Types
 
@@ -239,6 +318,8 @@ Limit the scope of changes:
   max_files_changed: 3
   require_approval: true
 ```
+
+---
 
 ## Inline Diagnostics
 
@@ -351,6 +432,41 @@ All interactions are logged to `.llm-guardrail/logs.json` in your workspace:
 }
 ```
 
+---
+
+## Roadmap
+
+- [x] Core rule engine (v0.1)
+- [x] Metrics dashboard (v0.2)
+- [x] Quick fixes & per-folder overrides (v0.3)
+- [ ] JetBrains port (help wanted!)
+- [ ] Neovim plugin
+- [ ] CLI tool for CI/CD
+- [ ] Team/enterprise features
+
+## Contributing
+
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+**Good first issues:**
+- Improve error messages
+- Add more rule examples to docs
+- Expand test coverage
+
+## Security
+
+For security issues, please see [SECURITY.md](SECURITY.md).
+
 ## License
 
-MIT
+[MIT](LICENSE)
+
+---
+
+<div align="center">
+
+**[Star us on GitHub](https://github.com/AE-Hertz/llm-guardr41l)** — it helps others discover the project!
+
+Made with care for the AI-assisted coding era.
+
+</div>

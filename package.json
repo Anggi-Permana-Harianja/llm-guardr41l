@@ -2,13 +2,21 @@
   "name": "llm-guardr41l",
   "displayName": "LLM Guardr41l",
   "description": "Prevent LLMs from making unsolicited changes to your codebase. Monitor AI-generated code from Copilot, Claude, Cursor, etc. and enforce rules.",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "publisher": "llm-guardr41l",
   "engines": {
     "vscode": "^1.85.0"
   },
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "MIT",
   "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AE-Hertz/llm-guardr41l"
+  },
+  "bugs": {
+    "url": "https://github.com/AE-Hertz/llm-guardr41l/issues"
+  },
+  "homepage": "https://github.com/AE-Hertz/llm-guardr41l#readme",
   "categories": [
     "Other",
     "Machine Learning",
