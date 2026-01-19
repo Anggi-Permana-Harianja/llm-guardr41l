@@ -447,7 +447,7 @@ All interactions are logged to `.llm-guardrail/logs.json` in your workspace:
 - [x] All features consolidated (v0.4)
 - [ ] JetBrains port (help wanted!)
 - [ ] Neovim plugin
-- [ ] CLI tool for CI/CD
+- [x] CLI tool for CI/CD
 - [ ] Team/enterprise features
 
 ## Contributing
