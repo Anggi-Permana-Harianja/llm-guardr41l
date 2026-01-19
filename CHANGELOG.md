@@ -5,6 +5,26 @@ All notable changes to LLM Guardr41l will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-01-19
+
+### Added
+- **CLI Tool** - Command-line interface for CI/CD integration
+  - `guardrail init` - Initialize rules.yaml with templates (minimal, standard, strict)
+  - `guardrail check --staged` - Validate git staged changes
+  - `guardrail check --commit <sha>` - Validate specific commits
+  - `guardrail validate` - Compare two files against rules
+- **Multiple Output Formats**
+  - Text (human-readable with colors)
+  - JSON (for programmatic use)
+  - SARIF (for GitHub Code Scanning integration)
+- **Core Module Extraction** - Shared validation logic between CLI and extension
+- Pre-commit hook support
+- GitHub Actions / GitLab CI integration examples
+
+### Changed
+- Refactored validation logic into reusable `src/core/` module
+- Updated README with CLI documentation
+
 ## [0.4.0] - 2026-01-19
 
 ### Added
@@ -101,6 +121,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - CSV export support
   - Tracks all interactions and violations
 
+[0.5.0]: https://github.com/AE-Hertz/llm-guardr41l/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/AE-Hertz/llm-guardr41l/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/AE-Hertz/llm-guardr41l/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/AE-Hertz/llm-guardr41l/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/AE-Hertz/llm-guardr41l/compare/v0.1.0...v0.1.3

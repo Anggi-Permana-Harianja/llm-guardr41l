@@ -2,10 +2,15 @@
   "name": "llm-guardr41l",
   "displayName": "LLM Guardr41l",
   "description": "Prevent LLMs from making unsolicited changes to your codebase. Monitor AI-generated code from Copilot, Claude, Cursor, etc. and enforce rules.",
-  "version": "0.4.0",
+  "version": "0.5.1",
   "publisher": "llm-guardr41l",
+  "bin": {
+    "guardrail": "./dist/cli/index.js",
+    "llm-guardrail": "./dist/cli/index.js"
+  },
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.85.0",
+    "node": ">=18.0.0"
   },
   "license": "MIT",
   "icon": "icon.png",
@@ -179,7 +184,10 @@
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
     "lint": "eslint src --ext ts,tsx",
     "test": "jest",
-    "build-webview": "webpack --config webpack.webview.config.js"
+    "build-webview": "webpack --config webpack.webview.config.js",
+    "build-cli": "tsc -p tsconfig.cli.json",
+    "watch-cli": "tsc -p tsconfig.cli.json --watch",
+    "prepublishOnly": "npm run build-cli"
   },
   "devDependencies": {
     "@types/diff": "^5.2.1",
@@ -204,6 +212,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
+    "commander": "^12.0.0",
     "diff": "^5.2.0",
     "js-yaml": "^4.1.0",
     "openai": "^4.77.0",

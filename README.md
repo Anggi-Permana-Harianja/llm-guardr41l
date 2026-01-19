@@ -104,6 +104,8 @@ global:
 
 ## Installation
 
+### VS Code Extension
+
 **From VS Code Marketplace (Recommended):**
 1. Open VS Code
 2. Go to Extensions (Cmd+Shift+X or Ctrl+Shift+X)
@@ -117,6 +119,18 @@ cd llm-guardr41l
 npm install
 npm run package
 # Install the generated .vsix file via Extensions > ... > Install from VSIX
+```
+
+### CLI Tool
+
+**Via npm (Recommended):**
+```bash
+npm install -g llm-guardr41l
+```
+
+**Via npx (no install):**
+```bash
+npx llm-guardr41l check --staged
 ```
 
 ---
@@ -439,15 +453,105 @@ All interactions are logged to `.llm-guardrail/logs.json` in your workspace:
 
 ---
 
+## CLI Tool
+
+The CLI tool validates code changes from the command line, enabling CI/CD integration and pre-commit hooks.
+
+### Commands
+
+```bash
+# Initialize guardrails in your project
+guardrail init [--template minimal|standard|strict]
+
+# Check git staged changes
+guardrail check --staged
+
+# Check a specific commit
+guardrail check --commit <sha>
+
+# Validate changes between two files
+guardrail validate --before old.ts --after new.ts
+```
+
+### Output Formats
+
+```bash
+# Human-readable text (default)
+guardrail check --staged
+
+# JSON (for programmatic use)
+guardrail check --staged --format json
+
+# SARIF (for GitHub Code Scanning)
+guardrail check --staged --format sarif --output results.sarif
+```
+
+### CI/CD Integration
+
+**GitHub Actions:**
+```yaml
+- name: Check LLM changes
+  run: npx llm-guardr41l check --staged --format sarif --output results.sarif
+
+- name: Upload SARIF
+  uses: github/codeql-action/upload-sarif@v2
+  with:
+    sarif_file: results.sarif
+```
+
+**Pre-commit Hook:**
+```bash
+# .git/hooks/pre-commit
+#!/bin/sh
+npx llm-guardr41l check --staged || exit 1
+```
+
+**GitLab CI:**
+```yaml
+guardrail:
+  script:
+    - npx llm-guardr41l check --commit $CI_COMMIT_SHA
+  allow_failure: false
+```
+
+### CLI Options
+
+| Command | Options | Description |
+|---------|---------|-------------|
+| `init` | `--template`, `--force` | Initialize rules.yaml |
+| `check` | `--staged`, `--commit`, `--rules`, `--format`, `--output`, `--verbose` | Validate git changes |
+| `validate` | `--before`, `--after`, `--rules`, `--format`, `--output`, `--verbose` | Validate file changes |
+
+### Exit Codes
+
+- `0` — All checks passed
+- `1` — Violations found or error occurred
+
+---
+
+## Version History
+
+| Version | Highlights |
+|---------|------------|
+| **v0.5** | CLI tool for CI/CD, SARIF output, pre-commit hooks |
+| **v0.4** | Open source release, GitHub Actions CI |
+| **v0.3** | Quick fix actions, per-folder overrides, undo rejection |
+| **v0.2** | Inline diagnostics, metrics dashboard, project scanner |
+| **v0.1** | Core rule engine, real-time monitoring, diff preview |
+
+See [CHANGELOG.md](CHANGELOG.md) for full details.
+
+---
+
 ## Roadmap
 
 - [x] Core rule engine (v0.1)
 - [x] Metrics dashboard (v0.2)
 - [x] Quick fixes & per-folder overrides (v0.3)
-- [x] All features consolidated (v0.4)
+- [x] Open source release (v0.4)
+- [x] CLI tool for CI/CD (v0.5)
 - [ ] JetBrains port (help wanted!)
 - [ ] Neovim plugin
-- [ ] CLI tool for CI/CD
 - [ ] Team/enterprise features
 
 ## Contributing
