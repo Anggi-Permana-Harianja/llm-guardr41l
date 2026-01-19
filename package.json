@@ -2,7 +2,7 @@
   "name": "llm-guardr41l",
   "displayName": "LLM Guardr41l",
   "description": "Prevent LLMs from making unsolicited changes to your codebase. Monitor AI-generated code from Copilot, Claude, Cursor, etc. and enforce rules.",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "publisher": "llm-guardr41l",
   "bin": {
     "guardrail": "./dist/cli/index.js",
