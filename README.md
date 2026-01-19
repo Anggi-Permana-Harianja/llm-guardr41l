@@ -444,6 +444,7 @@ All interactions are logged to `.llm-guardrail/logs.json` in your workspace:
 - [x] Core rule engine (v0.1)
 - [x] Metrics dashboard (v0.2)
 - [x] Quick fixes & per-folder overrides (v0.3)
+- [x] All features consolidated (v0.4)
 - [ ] JetBrains port (help wanted!)
 - [ ] Neovim plugin
 - [ ] CLI tool for CI/CD
