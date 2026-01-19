@@ -1,0 +1,107 @@
+# ============================================
+# LLM Guardr41l Preset: backend-api
+# ============================================
+# For server-side code (Node.js, Python, Go, Rust)
+#
+# Prevents AI from leaking secrets, enabling
+# SQL injection, or logging PII.
+#
+# Usage: Copy to your project root as `rules.yaml`
+# ============================================
+
+rules:
+  # ------------------------------------------
+  # SECRETS: No hardcoded credentials
+  # ------------------------------------------
+  - type: content
+    description: "Block hardcoded secrets"
+    patterns:
+      deny:
+        - "password\\s*=\\s*['\"][^'\"]+['\"]"
+        - "api_key\\s*=\\s*['\"][^'\"]+['\"]"
+        - "apiKey\\s*=\\s*['\"][^'\"]+['\"]"
+        - "secret\\s*=\\s*['\"][^'\"]+['\"]"
+        - "token\\s*=\\s*['\"][^'\"]+['\"]"
+        - "AWS_ACCESS_KEY"
+        - "PRIVATE_KEY"
+        - "-----BEGIN RSA"
+        - "-----BEGIN OPENSSH"
+
+  # ------------------------------------------
+  # SQL INJECTION: Prevent injection vectors
+  # ------------------------------------------
+  - type: content
+    description: "Prevent SQL injection patterns"
+    patterns:
+      deny:
+        - "\\$\\{.*\\}.*SELECT"      # Template literal in SQL
+        - "\\+.*SELECT.*FROM"        # String concat in SQL
+        - "f\".*SELECT.*{.*}\""      # Python f-string SQL
+        - "execute\\(.*\\+.*\\)"     # Concatenated execute
+
+  # ------------------------------------------
+  # LOGGING: No PII in logs
+  # ------------------------------------------
+  - type: content
+    description: "No sensitive data in logs"
+    forbid:
+      - console.log
+      - console.debug
+      - print(
+    patterns:
+      deny:
+        - "log.*password"
+        - "log.*token"
+        - "log.*secret"
+        - "log.*email"
+        - "log.*ssn"
+
+  # ------------------------------------------
+  # ERROR HANDLING: No stack traces to clients
+  # ------------------------------------------
+  - type: content
+    description: "No internal errors exposed"
+    patterns:
+      deny:
+        - "res\\.send\\(.*err\\.stack"
+        - "res\\.json\\(.*error\\.stack"
+
+  # ------------------------------------------
+  # DEPENDENCIES: Security-focused
+  # ------------------------------------------
+  - type: dependencies
+    description: "Block insecure packages"
+    forbidden:
+      - request       # Deprecated
+      - crypto-js     # Use native crypto
+      - md5           # Insecure hash
+      - sha1          # Insecure hash
+
+  # ------------------------------------------
+  # REFACTORING: Stay focused
+  # ------------------------------------------
+  - type: refactor
+    description: "No unsolicited changes"
+    forbid:
+      - variable_renames
+      - add_error_handling
+      - add_comments
+
+  # ------------------------------------------
+  # BLAST RADIUS: Backend = smaller changes
+  # ------------------------------------------
+  - type: threshold
+    description: "Smaller changes for backend"
+    max_lines_changed: 75
+    max_files_changed: 3
+
+global:
+  require_approval_for_all: true   # Backend needs review
+  log_all_interactions: true
+
+# ------------------------------------------
+# COMBINE WITH:
+# ------------------------------------------
+# • dependency-lockdown.yaml (total control)
+# • enterprise-safe.yaml (compliance)
+# ------------------------------------------

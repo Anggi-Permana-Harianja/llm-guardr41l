@@ -1,0 +1,64 @@
+# ============================================
+# LLM Guardr41l Preset: safe-default
+# ============================================
+# THE RECOMMENDED STARTING POINT
+# Install → Protected. Zero config needed.
+#
+# This preset stops "AI went wild" moments.
+# Enable this and forget about it.
+#
+# Usage: Copy to your project root as `rules.yaml`
+# ============================================
+
+rules:
+  # ------------------------------------------
+  # DEPENDENCIES: No surprise packages
+  # ------------------------------------------
+  - type: dependencies
+    description: "Block new dependencies unless explicitly allowed"
+    forbidden:
+      - "*"  # Flag ALL new dependencies for review
+    # Add your approved packages to 'allowed' list:
+    # allowed:
+    #   - react
+    #   - axios
+
+  # ------------------------------------------
+  # BLAST RADIUS: Limit the damage
+  # ------------------------------------------
+  - type: threshold
+    description: "Block edits touching too many files"
+    max_files_changed: 3
+    max_lines_changed: 100
+
+  # ------------------------------------------
+  # REFACTORING: No drive-by changes
+  # ------------------------------------------
+  - type: refactor
+    description: "Block formatting-only and rename changes"
+    forbid:
+      - change_formatting     # No "I reformatted for consistency"
+      - variable_renames      # No "I renamed for clarity"
+
+  # ------------------------------------------
+  # EXPORTS: Protect your public API
+  # ------------------------------------------
+  - type: content
+    description: "Block renaming public exports"
+    patterns:
+      deny:
+        # Catches: export { oldName as newName }
+        - "export\\s*\\{[^}]*\\s+as\\s+"
+
+global:
+  require_approval_for_all: false  # Only flag violations
+  log_all_interactions: true
+
+# ------------------------------------------
+# WHY THIS WORKS:
+# ------------------------------------------
+# ✓ Stops "AI went wild" instantly
+# ✓ Saves teams from reviewing 500-line PRs
+# ✓ Zero debate - these rules are obvious
+# ✓ Customize by adding to 'allowed' list
+# ------------------------------------------

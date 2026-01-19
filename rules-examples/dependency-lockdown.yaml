@@ -1,0 +1,83 @@
+# ============================================
+# LLM Guardr41l Preset: dependency-lockdown
+# ============================================
+# For backend and enterprise developers.
+#
+# This preset alone is worth the install.
+#
+# AI loves to add dependencies.
+# This preset says "no."
+#
+# Usage: Copy to your project root as `rules.yaml`
+# ============================================
+
+rules:
+  # ------------------------------------------
+  # DEPENDENCIES: Total lockdown
+  # ------------------------------------------
+  - type: dependencies
+    description: "No new dependencies allowed"
+    forbidden:
+      - "*"  # Block EVERYTHING new
+
+  # ------------------------------------------
+  # PACKAGE FILES: Don't touch
+  # ------------------------------------------
+  - type: scope
+    description: "No package file modifications"
+    files:
+      - "!package.json"
+      - "!package-lock.json"
+      - "!yarn.lock"
+      - "!pnpm-lock.yaml"
+      - "!requirements.txt"
+      - "!Pipfile"
+      - "!Pipfile.lock"
+      - "!poetry.lock"
+      - "!pyproject.toml"
+      - "!Cargo.toml"
+      - "!Cargo.lock"
+      - "!go.mod"
+      - "!go.sum"
+      - "!Gemfile"
+      - "!Gemfile.lock"
+
+  # ------------------------------------------
+  # VERSION BUMPS: Not today
+  # ------------------------------------------
+  - type: content
+    description: "No version changes in package files"
+    patterns:
+      deny:
+        - '"version":\\s*"[0-9]'     # package.json version
+        - "version\\s*=\\s*['\"][0-9]"  # Python/Rust version
+
+  # ------------------------------------------
+  # IMPORT PATTERNS: Flag new imports
+  # ------------------------------------------
+  - type: content
+    description: "Flag new external imports"
+    patterns:
+      deny:
+        # New npm imports (not relative)
+        - "from\\s+['\"][^./][^'\"]+['\"]"
+        - "require\\(['\"][^./][^'\"]+['\"]\\)"
+        # Python new imports
+        - "^import\\s+(?!\\.|src|app|lib|utils|tests)"
+        - "^from\\s+(?!\\.|src|app|lib|utils|tests)"
+
+global:
+  require_approval_for_all: true   # Every import reviewed
+  log_all_interactions: true
+
+# ------------------------------------------
+# PERFECT FOR:
+# ------------------------------------------
+# • Enterprise security requirements
+# • Supply chain attack prevention
+# • Regulated industries (SOC2, HIPAA, PCI)
+# • "We just audited our dependencies last week"
+# • Monorepos with shared dependencies
+#
+# Combine with: enterprise-safe.yaml
+# ------------------------------------------

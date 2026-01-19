@@ -1,0 +1,95 @@
+# ============================================
+# LLM Guardr41l Preset: no-bad-practices
+# ============================================
+# Extremely popular. People hate AI clutter.
+#
+# This preset catches the stuff that makes
+# code reviewers lose their minds.
+#
+# Usage: Copy to your project root as `rules.yaml`
+# ============================================
+
+rules:
+  # ------------------------------------------
+  # DEBUG CODE: The classics
+  # ------------------------------------------
+  - type: content
+    description: "No debug artifacts"
+    forbid:
+      - console.log
+      - console.debug
+      - console.warn
+      - console.info
+      - debugger
+      - print(           # Python
+      - println!         # Rust
+      - fmt.Println      # Go
+
+  # ------------------------------------------
+  # TODO/FIXME: Ship it or delete it
+  # ------------------------------------------
+  - type: content
+    description: "No TODO comments"
+    patterns:
+      deny:
+        - "\\/\\/ TODO"
+        - "\\/\\/ FIXME"
+        - "\\/\\/ HACK"
+        - "\\/\\/ XXX"
+        - "\\/\\/ BUG"
+        - "# TODO"
+        - "# FIXME"
+        - "# HACK"
+
+  # ------------------------------------------
+  # COMMENTED CODE: Dead code walking
+  # ------------------------------------------
+  - type: content
+    description: "No commented-out code"
+    patterns:
+      deny:
+        # JS/TS commented code patterns
+        - "\\/\\/\\s*(const|let|var|function|class|import|export)\\s+"
+        - "\\/\\*[\\s\\S]*?(function|class|const|let|var)[\\s\\S]*?\\*\\/"
+        # Python commented code
+        - "#\\s*(def|class|import|from)\\s+"
+
+  # ------------------------------------------
+  # UNUSED IMPORTS: Clean up after yourself
+  # ------------------------------------------
+  - type: content
+    description: "Flag potential unused imports"
+    patterns:
+      deny:
+        # Common AI import spam patterns
+        - "import\\s+\\{[^}]{200,}\\}"  # Giant import blocks
+        - "from\\s+['\"]\\.[^'\"]+['\"]\\s*$"  # Import with nothing used
+
+  # ------------------------------------------
+  # TYPE SAFETY: No escape hatches
+  # ------------------------------------------
+  - type: content
+    description: "No TypeScript escape hatches"
+    patterns:
+      deny:
+        - ": any"
+        - "as any"
+        - "@ts-ignore"
+        - "@ts-nocheck"
+        - "// eslint-disable"
+
+global:
+  require_approval_for_all: false  # Just flag the issues
+  log_all_interactions: true
+
+# ------------------------------------------
+# WHY THIS SPREADS:
+# ------------------------------------------
+# Everyone hates reviewing PRs with:
+# • console.log("here")
+# • // TODO: fix this later
+# • 50 lines of commented-out code
+# • import { everything } from 'lodash'
+#
+# This preset = instant code quality boost
+# ------------------------------------------

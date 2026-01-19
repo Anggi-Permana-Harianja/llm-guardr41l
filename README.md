@@ -9,7 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/Anggi-Permana-Harianja/llm-guardr41l/actions/workflows/ci.yml/badge.svg)](https://github.com/Anggi-Permana-Harianja/llm-guardr41l/actions/workflows/ci.yml)
 
-[Install from Marketplace](https://marketplace.visualstudio.com/items?itemName=llm-guardr41l.llm-guardr41l) · [Documentation](#usage) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
+[Install from Marketplace](https://marketplace.visualstudio.com/items?itemName=llm-guardr41l.llm-guardr41l) · [Presets](#presets) · [Documentation](#usage) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
@@ -17,11 +17,73 @@
 
 ## The Problem
 
-AI coding assistants are powerful — but unpredictable. Copilot adds `console.log` everywhere. Claude refactors your variable names. Cursor imports packages you've banned. Autonomous agents rewrite entire files.
+AI coding tools are fast — but reckless.
 
-**LLM Guardr41l acts as a bouncer for your code.** Define rules once, enforce them automatically on every AI-generated change.
+They:
+- Rewrite files you didn't ask for
+- Rename variables across your codebase
+- Add banned dependencies
+- Sprinkle `console.log` everywhere
+- Turn small edits into massive diffs
 
-> **No API key required!** LLM Guardr41l monitors code changes from any source — GitHub Copilot, Claude, Cursor, ChatGPT pastes, or any other AI tool. It works by watching your editor for changes, not by intercepting API calls. API keys are only needed for the optional "Generate Code" feature.
+**LLM Guardr41l puts guardrails on AI-generated code.**
+
+It watches your editor and enforces rules on every change, no matter where it comes from.
+
+---
+
+## What It Does
+
+- **Block unwanted imports and dependencies**
+- **Prevent large refactors and mass edits**
+- **Enforce project rules automatically**
+- **Detect risky or suspicious code changes**
+- **Works in real time — before code is committed**
+
+---
+
+## Works With Any AI Tool
+
+LLM Guardr41l is tool-agnostic. It works with:
+
+- GitHub Copilot
+- Cursor
+- Claude
+- ChatGPT pastes
+- Autonomous agents
+- Any future AI tool
+
+**No API interception. No vendor lock-in.**
+
+---
+
+## No API Keys Required
+
+LLM Guardr41l works by watching code changes, not calling AI APIs.
+
+**Your code stays local. Your workflow stays the same.**
+
+> API keys are only needed for the optional "Generate Code" feature.
+
+---
+
+## Why Developers Install It
+
+> "Copilot changed files I didn't touch"
+
+> "Why did this PR explode to 300 lines?"
+
+> "Who imported this dependency?"
+
+> "AI refactored my code without asking"
+
+**Guardr41l stops that — automatically.**
+
+---
+
+## Open Source
+
+LLM Guardr41l is fully open source. Audit it. Extend it. Customize it.
 
 <!--
 ## Demo
@@ -40,7 +102,43 @@ ext install llm-guardr41l.llm-guardr41l
 
 Or search "LLM Guardr41l" in VS Code Extensions.
 
-**2. Create `rules.yaml` in your project root**
+**2. Pick a preset and copy it to your project root**
+
+```bash
+# Recommended: Start with safe-default
+curl -o rules.yaml https://raw.githubusercontent.com/Anggi-Permana-Harianja/llm-guardr41l/main/rules-examples/safe-default.yaml
+```
+
+**3. That's it.** LLM Guardr41l now monitors all code changes and enforces your rules.
+
+---
+
+## Presets
+
+Don't write rules from scratch. **Pick an opinionated preset:**
+
+### Core Presets
+
+| Preset | Best For | Why It Spreads |
+|--------|----------|----------------|
+| **[safe-default](rules-examples/safe-default.yaml)** | Everyone | Stops "AI went wild". **Start here.** |
+| **[no-surprises](rules-examples/no-surprises.yaml)** | Burned by Copilot | "I asked for one function. Why 12 files?" |
+| **[no-bad-practices](rules-examples/no-bad-practices.yaml)** | Code quality | No `console.log`, no `TODO`, no clutter |
+| **[dependency-lockdown](rules-examples/dependency-lockdown.yaml)** | Enterprise | This preset alone is worth the install |
+| **[ai-on-leash](rules-examples/ai-on-leash.yaml)** | Cautious devs | Perfect for Fridays |
+
+### Domain-Specific
+
+| Preset | Best For |
+|--------|----------|
+| **[web-app](rules-examples/web-app.yaml)** | React, Vue, Angular — XSS, bundle size, TypeScript |
+| **[backend-api](rules-examples/backend-api.yaml)** | Node, Python, Go — secrets, SQL injection, PII |
+| **[enterprise-safe](rules-examples/enterprise-safe.yaml)** | SOC2, HIPAA, PCI — full audit trail |
+
+See all presets: [rules-examples/](rules-examples/)
+
+<details>
+<summary><strong>Or write your own rules.yaml</strong></summary>
 
 ```yaml
 rules:
@@ -68,7 +166,7 @@ global:
   require_approval_for_all: true
 ```
 
-**3. That's it.** LLM Guardr41l now monitors all code changes and enforces your rules.
+</details>
 
 ---
 

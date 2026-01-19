@@ -1,0 +1,80 @@
+# ============================================
+# LLM Guardr41l Preset: ai-on-leash
+# ============================================
+# Keep your AI assistant on a short leash.
+#
+# "AI may help — but only surgically."
+#
+# Perfect for:
+# • Legacy codebases
+# • Risky deployments
+# • Fridays
+#
+# Usage: Copy to your project root as `rules.yaml`
+# ============================================
+
+rules:
+  # ------------------------------------------
+  # BLAST RADIUS: Maximum restriction
+  # ------------------------------------------
+  - type: threshold
+    description: "Tiny changes only"
+    max_lines_changed: 25     # That's it. 25 lines max.
+    max_files_changed: 1      # ONE file. Period.
+
+  # ------------------------------------------
+  # REFACTORING: Absolutely not
+  # ------------------------------------------
+  - type: refactor
+    description: "No refactoring allowed"
+    forbid:
+      - variable_renames
+      - add_error_handling
+      - add_comments
+      - change_formatting
+
+  # ------------------------------------------
+  # AUTO-IMPORTS: Nope
+  # ------------------------------------------
+  - type: dependencies
+    description: "No auto-imports"
+    forbidden:
+      - "*"  # Flag everything
+
+  # ------------------------------------------
+  # WHITESPACE: Don't even
+  # ------------------------------------------
+  - type: content
+    description: "No formatting noise"
+    patterns:
+      deny:
+        - "^\\s+$"           # Whitespace-only lines
+        - "^-\\s*$"          # Empty deletions
+        - "^\\+\\s*$"        # Empty additions
+
+  # ------------------------------------------
+  # REORDERING: Keep it where it is
+  # ------------------------------------------
+  - type: content
+    description: "No import/export reordering"
+    patterns:
+      deny:
+        - "^import.*\\n^import"    # Reordered imports
+
+global:
+  require_approval_for_all: true   # EVERYTHING needs approval
+  log_all_interactions: true
+  strict_mode: true
+
+# ------------------------------------------
+# USE THIS WHEN:
+# ------------------------------------------
+# • It's Friday afternoon
+# • You're touching payment code
+# • The last AI change broke prod
+# • You're in a legacy codebase
+# • You just want ONE THING changed
+# • Mercury is in retrograde
+#
+# "Trust, but verify. Actually, just verify."
+# ------------------------------------------

@@ -1,0 +1,91 @@
+# ============================================
+# LLM Guardr41l Preset: web-app
+# ============================================
+# For frontend projects (React, Vue, Angular, Svelte)
+#
+# Prevents AI from introducing XSS, bloating your
+# bundle, or breaking your TypeScript.
+#
+# Usage: Copy to your project root as `rules.yaml`
+# ============================================
+
+rules:
+  # ------------------------------------------
+  # SECURITY: Block XSS vectors
+  # ------------------------------------------
+  - type: content
+    description: "Block XSS vulnerabilities"
+    forbid:
+      - innerHTML
+      - outerHTML
+      - document.write
+      - dangerouslySetInnerHTML
+    patterns:
+      deny:
+        - "eval\\("
+        - "Function\\("
+        - "setTimeout\\(['\"]"
+        - "setInterval\\(['\"]"
+
+  # ------------------------------------------
+  # BUNDLE SIZE: No bloat
+  # ------------------------------------------
+  - type: dependencies
+    description: "Block bloated packages"
+    forbidden:
+      - moment        # 300kb+ | Use: date-fns, dayjs
+      - lodash        # Import lodash/get, not full lodash
+      - jquery        # It's 2025
+      - underscore    # Use native JS
+
+  # ------------------------------------------
+  # CODE QUALITY: No debug artifacts
+  # ------------------------------------------
+  - type: content
+    description: "No debugging code"
+    forbid:
+      - console.log
+      - console.debug
+      - debugger
+      - alert(
+
+  # ------------------------------------------
+  # TYPESCRIPT: Enforce type safety
+  # ------------------------------------------
+  - type: content
+    description: "No type escape hatches"
+    patterns:
+      deny:
+        - ": any"
+        - "as any"
+        - "@ts-ignore"
+        - "@ts-nocheck"
+
+  # ------------------------------------------
+  # REFACTORING: Stay focused
+  # ------------------------------------------
+  - type: refactor
+    description: "No unsolicited changes"
+    forbid:
+      - variable_renames
+      - add_comments
+      - change_formatting
+
+  # ------------------------------------------
+  # BLAST RADIUS: Limit damage
+  # ------------------------------------------
+  - type: threshold
+    description: "Prevent massive changes"
+    max_lines_changed: 100
+    max_files_changed: 5
+
+global:
+  require_approval_for_all: false
+  log_all_interactions: true
+
+# ------------------------------------------
+# COMBINE WITH:
+# ------------------------------------------
+# • no-bad-practices.yaml (cleaner code)
+# • safe-default.yaml (dependency control)
+# ------------------------------------------

@@ -1,0 +1,136 @@
+# ============================================
+# LLM Guardr41l Preset: enterprise-safe
+# ============================================
+# Maximum safety for corporate/regulated environments.
+#
+# Every AI change requires explicit approval.
+# Full audit trail. Zero tolerance for noise.
+#
+# Perfect for: SOC2, HIPAA, PCI, fintech, healthcare
+#
+# Usage: Copy to your project root as `rules.yaml`
+# ============================================
+
+rules:
+  # ------------------------------------------
+  # SECURITY: Block all vulnerability patterns
+  # ------------------------------------------
+  - type: content
+    description: "Block security vulnerabilities"
+    forbid:
+      - eval(
+      - innerHTML
+      - document.write
+      - dangerouslySetInnerHTML
+    patterns:
+      deny:
+        - "eval\\("
+        - "Function\\("
+        - "exec\\("
+        - "spawn\\("
+        - "child_process"
+        - "\\$\\{.*\\}.*SELECT"
+        - "password\\s*=\\s*['\"]"
+        - "secret\\s*=\\s*['\"]"
+        - "-----BEGIN"
+
+  # ------------------------------------------
+  # COMPLIANCE: No PII exposure
+  # ------------------------------------------
+  - type: content
+    description: "Prevent PII in logs/responses"
+    patterns:
+      deny:
+        - "log.*email"
+        - "log.*password"
+        - "log.*ssn"
+        - "log.*social.*security"
+        - "log.*credit.*card"
+        - "log.*phone"
+        - "console\\.log.*user"
+
+  # ------------------------------------------
+  # DEPENDENCIES: Strict allowlist
+  # ------------------------------------------
+  - type: dependencies
+    description: "Pre-approved packages only"
+    forbidden:
+      - "*"  # Block all new dependencies
+
+  # ------------------------------------------
+  # CODE QUALITY: No debug artifacts ever
+  # ------------------------------------------
+  - type: content
+    description: "No debug code"
+    forbid:
+      - console.log
+      - console.debug
+      - console.warn
+      - console.error
+      - debugger
+      - TODO
+      - FIXME
+      - HACK
+      - XXX
+
+  # ------------------------------------------
+  # TYPESCRIPT: Maximum type safety
+  # ------------------------------------------
+  - type: content
+    description: "Enforce strict typing"
+    patterns:
+      deny:
+        - ": any"
+        - "as any"
+        - "as unknown"
+        - "@ts-ignore"
+        - "@ts-nocheck"
+        - "@ts-expect-error"
+        - "// eslint-disable"
+
+  # ------------------------------------------
+  # REFACTORING: Zero tolerance
+  # ------------------------------------------
+  - type: refactor
+    description: "No unsolicited changes"
+    forbid:
+      - variable_renames
+      - add_error_handling
+      - add_comments
+      - change_formatting
+
+  # ------------------------------------------
+  # MINIMAL DIFF: PR sanity (no noise)
+  # ------------------------------------------
+  - type: content
+    description: "No noise in PRs"
+    patterns:
+      deny:
+        - "^\\s+$"              # Whitespace-only changes
+        - "^import.*\\n^import"  # Reordered imports
+
+  # ------------------------------------------
+  # BLAST RADIUS: Conservative limits
+  # ------------------------------------------
+  - type: threshold
+    description: "Strict change limits"
+    max_lines_changed: 50
+    max_files_changed: 2
+
+global:
+  require_approval_for_all: true   # EVERY change approved
+  log_all_interactions: true       # Full audit trail
+  strict_mode: true
+
+# ------------------------------------------
+# COMPLIANCE FEATURES:
+# ------------------------------------------
+# ✓ Full audit trail (log_all_interactions)
+# ✓ Explicit approval workflow
+# ✓ No PII in logs
+# ✓ No hardcoded secrets
+# ✓ Strict dependency control
+# ✓ Clean PRs (no whitespace noise)
+#
+# Combine with: dependency-lockdown.yaml
+# ------------------------------------------

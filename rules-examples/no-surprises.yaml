@@ -1,0 +1,69 @@
+# ============================================
+# LLM Guardr41l Preset: no-surprises
+# ============================================
+# For developers burned by Copilot.
+#
+# "I asked for one function. Why did it touch 12 files?"
+#
+# This preset keeps AI focused on exactly what you asked.
+#
+# Usage: Copy to your project root as `rules.yaml`
+# ============================================
+
+rules:
+  # ------------------------------------------
+  # SCOPE: Stay in your lane
+  # ------------------------------------------
+  - type: threshold
+    description: "No edits outside the active file"
+    max_files_changed: 1      # ONE file at a time
+    max_lines_changed: 50     # Focused changes only
+
+  # ------------------------------------------
+  # REFACTORING: Do what I asked, nothing more
+  # ------------------------------------------
+  - type: refactor
+    description: "No unsolicited improvements"
+    forbid:
+      - variable_renames       # "Renamed for clarity"
+      - add_error_handling     # "Added try/catch for safety"
+      - add_comments           # "Added comments to explain"
+      - change_formatting      # "Reformatted for consistency"
+
+  # ------------------------------------------
+  # CONTENT: No helpful additions
+  # ------------------------------------------
+  - type: content
+    description: "No surprise patterns"
+    patterns:
+      deny:
+        # Test snapshot rewrites
+        - "exports\\[.*\\]\\s*=\\s*`"
+        - "toMatchSnapshot"
+        - "toMatchInlineSnapshot"
+        # Auto-generated comments
+        - "\\/\\/ TODO"
+        - "\\/\\/ FIXME"
+        - "\\/\\/ NOTE:"
+        - "\\/\\*\\*[\\s\\S]*@param"     # JSDoc spam
+
+  # ------------------------------------------
+  # DEPENDENCIES: Don't import things I didn't ask for
+  # ------------------------------------------
+  - type: dependencies
+    description: "No surprise dependencies"
+    forbidden:
+      - "*"  # Flag all new imports
+
+global:
+  require_approval_for_all: true   # Show me EVERYTHING
+  log_all_interactions: true
+
+# ------------------------------------------
+# PERFECT FOR:
+# ------------------------------------------
+# • Developers who've been burned by AI
+# • Legacy codebases where one change breaks everything
+# • When you need surgical precision
+# • Pair programming with AI (you're the senior dev)
+# ------------------------------------------
