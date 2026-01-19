@@ -552,6 +552,7 @@ See [CHANGELOG.md](CHANGELOG.md) for full details.
 - [x] CLI tool for CI/CD (v0.5)
 - [ ] JetBrains port (help wanted!)
 - [ ] Neovim plugin
+- [x] CLI tool for CI/CD
 - [ ] Team/enterprise features
 
 ## Contributing
