@@ -74,26 +74,31 @@ global:
 
 ## Features
 
-### Core Features
-- **Real-time Change Monitoring**: Automatically detects code changes from any source (Copilot, Claude Code, Cursor, ChatGPT pastes, etc.) and validates them against your rules
-- **Rule Configuration**: Define rules in a `rules.yaml` file to control how LLMs can modify your code
-- **Prompt Guardrails**: Automatically inject rule directives into LLM prompts
-- **LLM Proxy**: Support for OpenAI and Anthropic APIs with rule-aware code generation
-- **Diff Validation**: Compare original vs. generated code and flag rule violations
-- **UI Preview**: Visual diff preview with highlighted changes and approval workflow
-- **Auto-Revert**: Automatically revert rejected changes to maintain code integrity
-- **Logging**: Track all LLM interactions and approvals in a JSON log file
+### Monitoring & Validation
+- **Real-time Change Monitoring** — Automatically detects code changes from any source (Copilot, Claude Code, Cursor, ChatGPT pastes, etc.) and validates them against your rules
+- **Inline Diagnostics** — Violations appear as squiggly underlines in the editor and in the Problems panel
+- **Diff Validation** — Compare original vs. generated code and flag rule violations
+- **UI Preview** — Visual diff preview with highlighted changes and approval workflow
+- **Auto-Revert** — Automatically revert rejected changes to maintain code integrity
 
-### v0.2.0 Features
-- **Inline Diagnostics**: Violations appear as squiggly underlines in the editor and in the Problems panel — no more intrusive popups
-- **Metrics Dashboard**: View approval rates, violation trends, and top violated rules in an interactive dashboard
-- **Project-Aware Defaults**: Auto-scan your project's `package.json`, `.eslintrc`, and `tsconfig.json` to generate smart rules
-- **Learn from Rejections**: The extension tracks rejection patterns and suggests new rules after repeated rejections
+### Rules Engine
+- **Rule Configuration** — Define rules in a `rules.yaml` file to control how LLMs can modify your code
+- **5 Rule Types** — Scope, refactor, dependencies, content, and threshold rules
+- **Per-folder Overrides** — Create `.llm-guardrail.yaml` files in subdirectories to customize rules per folder
+- **Project-Aware Defaults** — Auto-scan your `package.json`, `.eslintrc`, and `tsconfig.json` to generate smart rules
 
-### v0.3.0 Features
-- **Quick Fix Actions**: Click the lightbulb on any violation to add dependencies to allowlist, remove from forbidden list, adjust thresholds, or dismiss violations
-- **Per-folder Rule Overrides**: Create `.llm-guardrail.yaml` files in subdirectories to extend, replace, or disable rules for specific parts of your codebase
-- **Undo Rejection**: Accidentally rejected a change? Use `Guardrail: Undo Last Rejection` to restore it
+### Smart Assistance
+- **Quick Fix Actions** — Click the lightbulb on any violation to add dependencies to allowlist, adjust thresholds, or dismiss violations
+- **Learn from Rejections** — The extension tracks rejection patterns and suggests new rules after repeated rejections
+- **Undo Rejection** — Accidentally rejected a change? Restore it instantly
+
+### LLM Integration
+- **Prompt Guardrails** — Automatically inject rule directives into LLM prompts
+- **LLM Proxy** — Support for OpenAI and Anthropic APIs with rule-aware code generation
+
+### Analytics & Logging
+- **Metrics Dashboard** — View approval rates, violation trends, and top violated rules in an interactive dashboard
+- **Logging** — Track all LLM interactions and approvals in a JSON log file
 
 ---
 
