@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { loadRules, RulesConfig } from './rules';
-import { validateAgainstRules, ValidationResult } from './diff-validator';
+import { validateAgainstRules, ValidationResult, Violation } from './diff-validator';
 import { logGeneration } from './logger';
 import { getDiagnosticsManager } from './diagnostics-manager';
 
@@ -17,8 +17,19 @@ export interface MonitorConfig {
   minLinesChanged: number;
   minCharsChanged: number;
   debounceMs: number;
+  batchWindowMs: number;  // Time window to group multi-file changes
   ignoredPatterns: string[];
   autoRevertOnReject: boolean;
+}
+
+/**
+ * Tracks a batch of file changes that happen within a time window
+ * (likely from a single AI operation that modifies multiple files)
+ */
+export interface ChangeBatch {
+  files: Set<string>;  // URIs of files changed in this batch
+  startTime: number;
+  totalLinesChanged: number;
 }
 
 type PendingChangeHandler = (event: ChangeEvent, validation: ValidationResult) => void;
@@ -48,6 +59,9 @@ export class ChangeMonitor {
   private rejectedChanges: Map<string, RejectedChange> = new Map();
   // Global stack of recent rejections for quick undo
   private rejectionHistory: RejectedChange[] = [];
+  // Track multi-file change batches
+  private currentBatch: ChangeBatch | null = null;
+  private batchTimer: NodeJS.Timeout | null = null;
 
   constructor() {
     this.config = this.loadConfig();
@@ -65,6 +79,7 @@ export class ChangeMonitor {
       minLinesChanged: config.get<number>('monitorMinLines', 3),
       minCharsChanged: config.get<number>('monitorMinChars', 50),
       debounceMs: config.get<number>('monitorDebounceMs', 500),
+      batchWindowMs: config.get<number>('monitorBatchWindowMs', 2000),  // 2 second window for multi-file changes
       ignoredPatterns: config.get<string[]>('monitorIgnoredPatterns', [
         '*.md', '*.txt', '*.json', '*.yaml', '*.yml', '*.lock'
       ]),
@@ -131,8 +146,9 @@ export class ChangeMonitor {
     this.disposables.push(
       vscode.workspace.onDidSaveTextDocument((document) => {
         const uri = document.uri.toString();
-        // Only update snapshot if there's no pending review
-        if (!this.pendingChanges.has(uri)) {
+        // Only update snapshot if there's no pending review AND no pending debounce
+        // This prevents the race condition where save fires before debounce processes the change
+        if (!this.pendingChanges.has(uri) && !this.debounceTimers.has(uri)) {
           this.documentSnapshots.set(uri, document.getText());
         }
       })
@@ -466,6 +482,9 @@ export class ChangeMonitor {
       return;
     }
 
+    // Track this file in the current batch (for multi-file change detection)
+    this.addToBatch(uri, changeStats.linesChanged);
+
     // Mark as processing to avoid re-triggering
     this.isProcessing.add(uri);
 
@@ -490,6 +509,13 @@ export class ChangeMonitor {
         document.fileName.split('/').pop()
       );
 
+      // Check for multi-file threshold violation
+      const batchViolation = this.checkBatchThreshold();
+      if (batchViolation) {
+        validation.violations.push(batchViolation);
+        validation.valid = false;
+      }
+
       // Update inline diagnostics (squiggles in editor)
       const diagnosticsManager = getDiagnosticsManager();
       diagnosticsManager.updateDiagnostics(document, validation.violations, validation.diff.changes);
@@ -512,6 +538,62 @@ export class ChangeMonitor {
         this.onPendingChange(changeEvent, validation);
       }
     }
+  }
+
+  /**
+   * Add a file to the current change batch (for multi-file detection)
+   */
+  private addToBatch(uri: string, linesChanged: number): void {
+    const now = Date.now();
+
+    // If no current batch or batch window expired, start a new batch
+    if (!this.currentBatch || (now - this.currentBatch.startTime) > this.config.batchWindowMs) {
+      this.currentBatch = {
+        files: new Set(),
+        startTime: now,
+        totalLinesChanged: 0
+      };
+    }
+
+    // Add this file to the batch
+    this.currentBatch.files.add(uri);
+    this.currentBatch.totalLinesChanged += linesChanged;
+
+    // Reset the batch cleanup timer
+    if (this.batchTimer) {
+      clearTimeout(this.batchTimer);
+    }
+    this.batchTimer = setTimeout(() => {
+      this.currentBatch = null;
+    }, this.config.batchWindowMs);
+  }
+
+  /**
+   * Check if the current batch exceeds max_files_changed threshold
+   */
+  private checkBatchThreshold(): Violation | null {
+    if (!this.currentBatch || !this.rules) {
+      return null;
+    }
+
+    // Find threshold rules with max_files_changed
+    for (const rule of this.rules.rules) {
+      if (rule.type === 'threshold' && 'max_files_changed' in rule) {
+        const maxFiles = (rule as { max_files_changed?: number }).max_files_changed;
+        if (maxFiles !== undefined && this.currentBatch.files.size > maxFiles) {
+          return {
+            rule,
+            ruleType: 'threshold',
+            description: 'Too many files changed',
+            severity: 'error',
+            details: `Changed ${this.currentBatch.files.size} files in this batch, maximum allowed is ${maxFiles}. Files: ${Array.from(this.currentBatch.files).map(f => f.split('/').pop()).join(', ')}`,
+            lineNumbers: [1]
+          };
+        }
+      }
+    }
+
+    return null;
   }
 
   private calculateChangeStats(original: string, modified: string): {

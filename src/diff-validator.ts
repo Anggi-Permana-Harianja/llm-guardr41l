@@ -414,7 +414,7 @@ function validateContentRule(rule: ContentRule, original: string, generated: str
   return violations;
 }
 
-function validateThresholdRule(rule: ThresholdRule, diff: DiffResult): Violation[] {
+function validateThresholdRule(rule: ThresholdRule, diff: DiffResult, filesChanged?: number): Violation[] {
   const violations: Violation[] = [];
   const changedLines = getChangedLineNumbers(diff);
 
@@ -426,6 +426,18 @@ function validateThresholdRule(rule: ThresholdRule, diff: DiffResult): Violation
       severity: 'error',
       details: `Changed ${diff.totalLinesChanged} lines, maximum allowed is ${rule.max_lines_changed}`,
       lineNumbers: changedLines
+    });
+  }
+
+  // Check max_files_changed (when filesChanged count is provided, e.g., from CLI)
+  if (rule.max_files_changed !== undefined && filesChanged !== undefined && filesChanged > rule.max_files_changed) {
+    violations.push({
+      rule,
+      ruleType: 'threshold',
+      description: 'Too many files changed',
+      severity: 'error',
+      details: `Changed ${filesChanged} files, maximum allowed is ${rule.max_files_changed}`,
+      lineNumbers: [1]
     });
   }
 
@@ -479,7 +491,8 @@ export function validateAgainstRules(
   original: string,
   generated: string,
   rules: RulesConfig,
-  fileName?: string
+  fileName?: string,
+  filesChanged?: number  // Optional: total files changed (for multi-file validation)
 ): ValidationResult {
   const diff = computeDiff(original, generated);
   const violations: Violation[] = [];
@@ -500,7 +513,7 @@ export function validateAgainstRules(
         violations.push(...validateContentRule(rule, original, generated, diff));
         break;
       case 'threshold':
-        violations.push(...validateThresholdRule(rule, diff));
+        violations.push(...validateThresholdRule(rule, diff, filesChanged));
         if (rule.require_approval) {
           requiresApproval = true;
         }

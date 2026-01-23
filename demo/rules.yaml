@@ -1,0 +1,25 @@
+# Demo rules for GIF recording
+rules:
+  # Block forbidden dependencies
+  - type: dependencies
+    description: "No banned packages"
+    forbidden:
+      - moment
+      - jquery
+      - lodash
+
+  # No debugging artifacts
+  - type: content
+    description: "No debug code"
+    forbid:
+      - console.log
+      - debugger
+
+  # Limit change size
+  - type: threshold
+    description: "Limit blast radius"
+    max_lines_changed: 50
+    max_files_changed: 3
+
+global:
+  require_approval_for_all: true
