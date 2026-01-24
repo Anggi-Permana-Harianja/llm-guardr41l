@@ -279,8 +279,6 @@ async function handleMonitoredChange(
   changeEvent: ChangeEvent,
   validation: ValidationResult
 ): Promise<void> {
-  const fileName = path.basename(changeEvent.document.fileName);
-
   // Store state for monitored change
   currentValidation = validation;
   currentGeneratedCode = changeEvent.newContent;
@@ -825,11 +823,7 @@ function generateGitHubDiff(original: string, generated: string): string {
   const originalLines = original.split('\n');
   const generatedLines = generated.split('\n');
 
-  // Simple line-by-line diff
-  const maxLines = Math.max(originalLines.length, generatedLines.length);
   const diffLines: string[] = [];
-
-  let oldLineNum = 1;
   let newLineNum = 1;
 
   // Create a simple diff by comparing lines
