@@ -73,6 +73,123 @@ export function getRulesFilePath(): string | undefined {
   return path.join(workspaceFolders[0].uri.fsPath, 'rules.yaml');
 }
 
+/**
+ * Add exceptions to rules based on violations that were approved.
+ * This modifies the rules.yaml file to allow the patterns that were previously forbidden.
+ */
+export async function addExceptionsToRules(violations: Array<{
+  rule: Rule;
+  ruleType: string;
+  description: string;
+  details?: string;
+}>): Promise<boolean> {
+  const rulesPath = getRulesFilePath();
+  if (!rulesPath || !fs.existsSync(rulesPath)) {
+    console.log('Guardrail: No rules.yaml found at', rulesPath);
+    return false;
+  }
+
+  try {
+    const fileContent = fs.readFileSync(rulesPath, 'utf8');
+    const rules = yaml.load(fileContent) as RulesConfig;
+
+    if (!rules || !rules.rules) {
+      console.log('Guardrail: Invalid rules config');
+      return false;
+    }
+
+    let modified = false;
+
+    for (const violation of violations) {
+      console.log('Guardrail: Processing violation:', violation.ruleType, violation.details);
+
+      // Find matching rule by type only (JSON.stringify comparison is too strict)
+      const matchingRules = rules.rules.filter(r => r.type === violation.ruleType);
+
+      for (const rule of matchingRules) {
+        // Handle different rule types
+        if (rule.type === 'dependencies' && violation.details) {
+          // Extract dependency name from: "The dependency "moment" is not in the allowed list" or "is in the forbidden list"
+          const match = violation.details.match(/The dependency "([^"]+)"/);
+          if (match) {
+            const dep = match[1];
+            console.log('Guardrail: Found dependency to allow:', dep);
+
+            // Add to allowed list
+            if (!rule.allowed) {
+              rule.allowed = [];
+            }
+            if (!rule.allowed.includes(dep)) {
+              rule.allowed.push(dep);
+              modified = true;
+              console.log('Guardrail: Added to allowed list:', dep);
+            }
+
+            // Remove from forbidden list if present
+            if (rule.forbidden) {
+              const forbidIndex = rule.forbidden.indexOf(dep);
+              if (forbidIndex !== -1) {
+                rule.forbidden.splice(forbidIndex, 1);
+                modified = true;
+                console.log('Guardrail: Removed from forbidden list:', dep);
+              }
+            }
+          }
+        } else if (rule.type === 'content' && violation.details) {
+          // Extract pattern from: "The content "console.log" was added but is forbidden"
+          // or "The pattern "console.log" was found in added content"
+          const contentMatch = violation.details.match(/The content "([^"]+)"/);
+          const patternMatch = violation.details.match(/The pattern "([^"]+)"/);
+          const pattern = contentMatch ? contentMatch[1] : (patternMatch ? patternMatch[1] : null);
+
+          if (pattern) {
+            console.log('Guardrail: Found content pattern to allow:', pattern);
+
+            // Remove from forbid list if present
+            if (rule.forbid) {
+              const forbidIndex = rule.forbid.indexOf(pattern);
+              if (forbidIndex !== -1) {
+                rule.forbid.splice(forbidIndex, 1);
+                modified = true;
+                console.log('Guardrail: Removed from forbid list:', pattern);
+              }
+            }
+
+            // Remove from patterns.deny if present
+            if (rule.patterns?.deny) {
+              const denyIndex = rule.patterns.deny.indexOf(pattern);
+              if (denyIndex !== -1) {
+                rule.patterns.deny.splice(denyIndex, 1);
+                modified = true;
+                console.log('Guardrail: Removed from patterns.deny:', pattern);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    console.log('Guardrail: Rules modified:', modified);
+    if (modified) {
+      const yamlContent = yaml.dump(rules, {
+        lineWidth: -1,
+        noRefs: true,
+        quotingType: '"',
+        forceQuotes: false
+      });
+      console.log('Guardrail: Writing updated rules to:', rulesPath);
+      fs.writeFileSync(rulesPath, yamlContent, 'utf8');
+      console.log('Guardrail: Rules file updated successfully');
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error('Failed to update rules:', error);
+    return false;
+  }
+}
+
 export async function loadRules(): Promise<RulesConfig> {
   const rulesPath = getRulesFilePath();
 

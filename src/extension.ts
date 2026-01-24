@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { loadRules, createDefaultRulesFile, getRulesFilePath, generateRulesInteractive, rulesFileExists, createOverrideFile } from './rules';
+import { loadRules, createDefaultRulesFile, getRulesFilePath, generateRulesInteractive, rulesFileExists, createOverrideFile, addExceptionsToRules } from './rules';
 import { generateCode, isConfigured, getCurrentProvider, getCurrentModel } from './llm-proxy';
 import { validateAgainstRules, ValidationResult } from './diff-validator';
 import { logGeneration, logApproval, logRejection, logError, showLogsInEditor, getRecentLogs } from './logger';
@@ -30,6 +30,8 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Set up handler for detected changes
   monitor.onPendingChangeDetected((changeEvent: ChangeEvent, validation: ValidationResult) => {
+    console.log('Guardrail: onPendingChangeDetected callback fired');
+    console.log('Guardrail: violations count:', validation.violations.length);
     handleMonitoredChange(context, changeEvent, validation);
   });
 
@@ -81,11 +83,27 @@ export function activate(context: vscode.ExtensionContext) {
   const rejectChangeCommand = vscode.commands.registerCommand(
     'llm-guardrail.rejectChange',
     async () => {
-      if (isMonitoredChange && currentDocumentUri) {
-        await handleMonitorReject();
-      } else {
-        handleReject();
+      const monitor = getChangeMonitor();
+      const allPending = monitor.getAllPendingChanges();
+
+      console.log('Guardrail: Reject command - pending changes count:', allPending.size);
+
+      // Just reject the first pending change we find
+      for (const [uri, _change] of allPending) {
+        console.log('Guardrail: Reject command - rejecting URI:', uri);
+        const success = await monitor.rejectChange(uri);
+        if (success) {
+          vscode.window.showInformationMessage('Changes rejected and reverted');
+          const diagnosticsManager = getDiagnosticsManager();
+          diagnosticsManager.clearDiagnostics(vscode.Uri.parse(uri));
+          resetState();
+          return;
+        }
       }
+
+      // Nothing worked - show error
+      vscode.window.showWarningMessage('No pending changes to revert. Use Cmd+Z to undo manually.');
+      resetState();
     }
   );
 
@@ -319,9 +337,13 @@ async function handleMonitorReject(): Promise<void> {
   }
 
   const monitor = getChangeMonitor();
-  await monitor.rejectChange(currentDocumentUri);
+  const success = await monitor.rejectChange(currentDocumentUri);
 
-  vscode.window.showInformationMessage('Changes rejected and reverted');
+  if (success) {
+    vscode.window.showInformationMessage('Changes rejected and reverted');
+  } else {
+    vscode.window.showWarningMessage('Changes rejected but revert failed - please undo manually (Cmd+Z)');
+  }
 
   if (currentPanel) {
     currentPanel.dispose();
@@ -519,7 +541,8 @@ function showDiffPreview(context: vscode.ExtensionContext, data: DiffPreviewData
             await handleApprove();
             break;
           case 'reject':
-            handleReject();
+            // Use the proper reject command that actually reverts code
+            await vscode.commands.executeCommand('llm-guardrail.rejectChange');
             break;
           case 'editRules':
             await handleEditRules();
@@ -784,18 +807,12 @@ function getInlineWebviewContent(data: DiffPreviewData): string {
   </div>
 
   <div class="actions">
-    <button class="approve" onclick="approve()" ${!data.valid && errorCount > 0 ? 'disabled' : ''}>
-      ${data.requiresApproval ? 'Approve & Apply' : 'Apply Changes'}
+    <button class="approve" onclick="approve()">
+      ${data.requiresApproval ? 'Approve and update rules' : 'Apply Changes'}
     </button>
     <button class="reject" onclick="reject()">Reject</button>
     <button class="edit-rules" onclick="editRules()">Edit Rules</button>
   </div>
-
-  ${!data.valid && errorCount > 0 ? `
-  <div class="blocked-message">
-    Approval blocked due to rule errors. Fix violations or edit rules to proceed.
-  </div>
-  ` : ''}
 
   <script>
     const vscode = acquireVsCodeApi();
@@ -857,33 +874,55 @@ function generateGitHubDiff(original: string, generated: string): string {
 }
 
 async function handleApprove(): Promise<void> {
-  if (!currentEditor || !currentGeneratedCode || !currentValidation) {
+  if (!currentGeneratedCode || !currentValidation || !currentDocumentUri) {
     vscode.window.showErrorMessage('No pending changes to apply.');
     return;
   }
 
   try {
-    const editor = currentEditor;
-    const selection = editor.selection;
+    // Use WorkspaceEdit for more reliable editing (works even if editor not visible)
+    const uri = vscode.Uri.parse(currentDocumentUri);
+    const document = await vscode.workspace.openTextDocument(uri);
 
-    await editor.edit(editBuilder => {
-      if (!selection.isEmpty) {
-        editBuilder.replace(selection, currentGeneratedCode!);
-      } else {
-        const fullRange = new vscode.Range(
-          editor.document.positionAt(0),
-          editor.document.positionAt(editor.document.getText().length)
-        );
-        editBuilder.replace(fullRange, currentGeneratedCode!);
-      }
-    });
+    const fullRange = new vscode.Range(
+      document.positionAt(0),
+      document.positionAt(document.getText().length)
+    );
+
+    const workspaceEdit = new vscode.WorkspaceEdit();
+    workspaceEdit.replace(uri, fullRange, currentGeneratedCode);
+
+    const success = await vscode.workspace.applyEdit(workspaceEdit);
+    if (!success) {
+      throw new Error('Failed to apply edit');
+    }
 
     // Log approval
     if (currentLogId) {
       logApproval(currentLogId, currentValidation.diff.totalLinesChanged);
     }
 
-    vscode.window.showInformationMessage('Changes applied successfully!');
+    // Clear diagnostics and pending state from monitor
+    const monitor = getChangeMonitor();
+    await monitor.approveChange(currentDocumentUri);
+    const diagnosticsManager = getDiagnosticsManager();
+    diagnosticsManager.clearDiagnostics(uri);
+
+    // Update rules if there were violations that are being approved
+    if (currentValidation.violations && currentValidation.violations.length > 0) {
+      console.log('Guardrail: Attempting to update rules for violations:', currentValidation.violations);
+      const rulesUpdated = await addExceptionsToRules(currentValidation.violations);
+      console.log('Guardrail: Rules updated:', rulesUpdated);
+      if (rulesUpdated) {
+        // Reload rules in the monitor
+        await monitor.start();
+        vscode.window.showInformationMessage('Changes applied and rules updated!');
+      } else {
+        vscode.window.showInformationMessage('Changes applied (rules not updated - pattern not found in rules).');
+      }
+    } else {
+      vscode.window.showInformationMessage('Changes applied successfully!');
+    }
 
     // Close panel
     if (currentPanel) {

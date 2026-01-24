@@ -246,63 +246,89 @@ export class ChangeMonitor {
     }
   }
 
-  public async rejectChange(documentUri: string): Promise<void> {
+  public async rejectChange(documentUri: string): Promise<boolean> {
+    console.log('Guardrail: rejectChange called with URI:', documentUri);
+    console.log('Guardrail: pendingChanges keys:', Array.from(this.pendingChanges.keys()));
+    console.log('Guardrail: isProcessing keys:', Array.from(this.isProcessing));
+
     const change = this.pendingChanges.get(documentUri);
 
     // Clear diagnostics for this document
     const diagnosticsManager = getDiagnosticsManager();
     diagnosticsManager.clearDiagnostics(vscode.Uri.parse(documentUri));
 
-    if (change && this.config.autoRevertOnReject) {
-      const originalContent = change.originalContent;
-      const rejectedContent = change.newContent;
+    if (!change) {
+      console.log('Guardrail: No pending change found for', documentUri);
+      this.isProcessing.delete(documentUri);
+      return false;
+    }
 
-      // Store the rejected change for potential undo
-      const rejectedChange: RejectedChange = {
-        documentUri,
-        originalContent,
-        rejectedContent,
-        timestamp: Date.now(),
-        fileName: change.document.fileName.split('/').pop() || 'unknown'
-      };
-      this.rejectedChanges.set(documentUri, rejectedChange);
-      this.rejectionHistory.unshift(rejectedChange);
+    console.log('Guardrail: Found pending change, originalContent length:', change.originalContent.length);
+    console.log('Guardrail: Found pending change, newContent length:', change.newContent.length);
 
-      // Keep only last 10 rejections in history
-      if (this.rejectionHistory.length > 10) {
-        this.rejectionHistory.pop();
-      }
-
+    if (!this.config.autoRevertOnReject) {
+      console.log('Guardrail: Auto-revert is disabled');
       this.pendingChanges.delete(documentUri);
       this.isProcessing.delete(documentUri);
+      return false;
+    }
 
-      // Find the editor and revert
-      const editor = vscode.window.visibleTextEditors.find(
-        e => e.document.uri.toString() === documentUri
+    const originalContent = change.originalContent;
+    const rejectedContent = change.newContent;
+
+    // Store the rejected change for potential undo
+    const rejectedChange: RejectedChange = {
+      documentUri,
+      originalContent,
+      rejectedContent,
+      timestamp: Date.now(),
+      fileName: change.document.fileName.split('/').pop() || 'unknown'
+    };
+    this.rejectedChanges.set(documentUri, rejectedChange);
+    this.rejectionHistory.unshift(rejectedChange);
+
+    // Keep only last 10 rejections in history
+    if (this.rejectionHistory.length > 10) {
+      this.rejectionHistory.pop();
+    }
+
+    this.pendingChanges.delete(documentUri);
+    this.isProcessing.delete(documentUri);
+
+    // Temporarily disable monitoring to avoid triggering on revert
+    const wasEnabled = this.config.enabled;
+    this.config.enabled = false;
+
+    try {
+      // Use WorkspaceEdit for more reliable editing (works even if editor not visible)
+      const uri = vscode.Uri.parse(documentUri);
+      const document = await vscode.workspace.openTextDocument(uri);
+
+      const fullRange = new vscode.Range(
+        document.positionAt(0),
+        document.positionAt(document.getText().length)
       );
 
-      if (editor) {
-        // Temporarily disable monitoring to avoid triggering on revert
-        const wasEnabled = this.config.enabled;
-        this.config.enabled = false;
+      const workspaceEdit = new vscode.WorkspaceEdit();
+      workspaceEdit.replace(uri, fullRange, originalContent);
 
-        await editor.edit(editBuilder => {
-          const fullRange = new vscode.Range(
-            editor.document.positionAt(0),
-            editor.document.positionAt(editor.document.getText().length)
-          );
-          editBuilder.replace(fullRange, originalContent);
-        });
+      const success = await vscode.workspace.applyEdit(workspaceEdit);
 
-        // Re-enable monitoring
-        this.config.enabled = wasEnabled;
-
+      if (success) {
         // Update snapshot
         this.documentSnapshots.set(documentUri, originalContent);
+        console.log('Guardrail: Successfully reverted changes');
+      } else {
+        console.error('Guardrail: Failed to apply revert edit');
       }
-    } else {
-      this.pendingChanges.delete(documentUri);
-      this.isProcessing.delete(documentUri);
+
+      return success;
+    } catch (error) {
+      console.error('Guardrail: Error reverting changes:', error);
+      return false;
+    } finally {
+      // Re-enable monitoring
+      this.config.enabled = wasEnabled;
     }
   }
 
@@ -410,6 +436,13 @@ export class ChangeMonitor {
     return this.pendingChanges.get(documentUri);
   }
 
+  /**
+   * Get all pending changes - useful for rejecting any pending change
+   */
+  public getAllPendingChanges(): Map<string, ChangeEvent> {
+    return this.pendingChanges;
+  }
+
   public updateSnapshot(documentUri: string, content: string): void {
     this.documentSnapshots.set(documentUri, content);
   }
@@ -451,9 +484,31 @@ export class ChangeMonitor {
       return;
     }
 
-    // Skip if we're currently processing this document
+    // If we're currently processing this document, check if content actually changed
+    // Only clear pending state if user made a real change (cut/edited without approving/rejecting)
     if (this.isProcessing.has(uri)) {
-      return;
+      const pendingChange = this.pendingChanges.get(uri);
+      const currentContent = document.getText();
+
+      console.log('Guardrail: handleDocumentChange - isProcessing=true for', uri);
+      console.log('Guardrail: pendingChange exists:', !!pendingChange);
+      if (pendingChange) {
+        console.log('Guardrail: content matches pending:', currentContent === pendingChange.newContent);
+      }
+
+      // Only clear if content is different from what we're waiting to review
+      if (pendingChange && currentContent !== pendingChange.newContent) {
+        console.log('Guardrail: Content changed, clearing pending state');
+        this.pendingChanges.delete(uri);
+        this.isProcessing.delete(uri);
+        // Clear old diagnostics since the code has changed
+        const diagnosticsManager = getDiagnosticsManager();
+        diagnosticsManager.clearDiagnostics(document.uri);
+      } else {
+        // Content hasn't changed from pending state, skip re-processing
+        console.log('Guardrail: Content unchanged, skipping re-processing');
+        return;
+      }
     }
 
     // Clear existing debounce timer
@@ -507,6 +562,7 @@ export class ChangeMonitor {
 
     // Mark as processing to avoid re-triggering
     this.isProcessing.add(uri);
+    console.log('Guardrail: processChange - added to isProcessing:', uri);
 
     // Create change event
     const changeEvent: ChangeEvent = {
@@ -519,6 +575,7 @@ export class ChangeMonitor {
 
     // Store pending change
     this.pendingChanges.set(uri, changeEvent);
+    console.log('Guardrail: processChange - stored pendingChange for:', uri);
 
     // Validate against rules
     if (this.rules) {
