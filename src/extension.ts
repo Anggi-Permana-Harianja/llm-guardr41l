@@ -6,7 +6,7 @@ import { generateCode, isConfigured, getCurrentProvider, getCurrentModel } from 
 import { validateAgainstRules, ValidationResult } from './diff-validator';
 import { logGeneration, logApproval, logRejection, logError, showLogsInEditor, getRecentLogs } from './logger';
 import { getChangeMonitor, disposeChangeMonitor, ChangeEvent } from './change-monitor';
-import { disposeDiagnosticsManager } from './diagnostics-manager';
+import { disposeDiagnosticsManager, getDiagnosticsManager } from './diagnostics-manager';
 import { MetricsCalculator } from './metrics-calculator';
 import { scanProjectInteractive } from './project-scanner';
 import { GuardrailQuickFixProvider, registerQuickFixCommands } from './quick-fix-provider';
@@ -19,6 +19,7 @@ let currentLogId: string | undefined;
 let currentEditor: vscode.TextEditor | undefined;
 let currentDocumentUri: string | undefined;
 let isMonitoredChange: boolean = false;
+let missingRulesStatusBar: vscode.StatusBarItem | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
   console.log('LLM Guardrail extension is now active');
@@ -96,11 +97,39 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
-  // Register show problems panel command
-  const showProblemsCommand = vscode.commands.registerCommand(
-    'llm-guardrail.showProblemsPanel',
+  // Register show review panel command (opens Review panel for pending changes)
+  const showReviewCommand = vscode.commands.registerCommand(
+    'llm-guardrail.showReviewPanel',
     () => {
-      vscode.commands.executeCommand('workbench.action.problems.focus');
+      // If there's a pending change, show the review panel
+      if (currentValidation && currentDocumentUri) {
+        const monitor = getChangeMonitor();
+        const pendingChange = monitor.getPendingChange(currentDocumentUri);
+        if (pendingChange) {
+          const fileName = path.basename(pendingChange.document.fileName);
+          showDiffPreview(context, {
+            original: pendingChange.originalContent,
+            generated: pendingChange.newContent,
+            violations: currentValidation.violations.map(v => ({
+              ruleType: v.ruleType,
+              description: v.description,
+              severity: v.severity,
+              details: v.details,
+              lineNumbers: v.lineNumbers
+            })),
+            diff: {
+              linesAdded: currentValidation.diff.linesAdded,
+              linesRemoved: currentValidation.diff.linesRemoved,
+              totalLinesChanged: currentValidation.diff.totalLinesChanged
+            },
+            fileName,
+            requiresApproval: currentValidation.requiresApproval,
+            valid: currentValidation.valid
+          });
+          return;
+        }
+      }
+      vscode.window.showInformationMessage('No pending changes to review.');
     }
   );
 
@@ -171,7 +200,7 @@ export function activate(context: vscode.ExtensionContext) {
     approveChangeCommand,
     rejectChangeCommand,
     generateRulesCommand,
-    showProblemsCommand,
+    showReviewCommand,
     showDashboardCommand,
     scanProjectCommand,
     undoRejectionCommand,
@@ -180,27 +209,68 @@ export function activate(context: vscode.ExtensionContext) {
     quickFixProvider
   );
 
-  // Auto-detect missing rules.yaml and prompt user
-  checkForRulesFile();
+  // Set up missing rules status bar and file watcher
+  setupMissingRulesWarning(context);
 }
 
-async function checkForRulesFile(): Promise<void> {
-  // Only check if workspace is open
+/**
+ * Creates a status bar warning when rules.yaml is missing.
+ * The warning is clickable and disappears once rules are created.
+ */
+function setupMissingRulesWarning(context: vscode.ExtensionContext): void {
+  // Only set up if workspace is open
   if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
     return;
   }
 
-  // Check if rules.yaml exists
-  if (!rulesFileExists()) {
-    const action = await vscode.window.showInformationMessage(
-      'LLM Guardrail: No rules.yaml found. Would you like to create one?',
-      'Generate Rules',
-      'Later'
-    );
+  // Create the status bar item (positioned to the left of the main guardrail status)
+  missingRulesStatusBar = vscode.window.createStatusBarItem(
+    vscode.StatusBarAlignment.Right,
+    99  // Slightly lower priority than main status bar (100)
+  );
+  missingRulesStatusBar.command = 'llm-guardrail.generateRules';
+  context.subscriptions.push(missingRulesStatusBar);
 
-    if (action === 'Generate Rules') {
-      await generateRulesInteractive();
-    }
+  // Update status bar based on current state
+  updateMissingRulesStatusBar();
+
+  // Watch for rules.yaml creation/deletion
+  const rulesPattern = new vscode.RelativePattern(
+    vscode.workspace.workspaceFolders[0],
+    'rules.yaml'
+  );
+  const watcher = vscode.workspace.createFileSystemWatcher(rulesPattern);
+
+  watcher.onDidCreate(() => updateMissingRulesStatusBar());
+  watcher.onDidDelete(() => updateMissingRulesStatusBar());
+
+  context.subscriptions.push(watcher);
+}
+
+/**
+ * Updates the missing rules status bar visibility and appearance.
+ * Also syncs the diagnostics manager to show/hide "Clean" status accordingly.
+ */
+function updateMissingRulesStatusBar(): void {
+  const hasRules = rulesFileExists();
+
+  // Sync change monitor - show "OFF" when no rules
+  getChangeMonitor().setHasRules(hasRules);
+
+  // Sync diagnostics manager - hide "Clean" status when no rules
+  getDiagnosticsManager().setHasRules(hasRules);
+
+  if (!missingRulesStatusBar) {
+    return;
+  }
+
+  if (!hasRules) {
+    missingRulesStatusBar.text = '$(warning) No Rules';
+    missingRulesStatusBar.tooltip = 'No rules.yaml found. Click to create one and start protecting your code.';
+    missingRulesStatusBar.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
+    missingRulesStatusBar.show();
+  } else {
+    missingRulesStatusBar.hide();
   }
 }
 
@@ -222,55 +292,10 @@ async function handleMonitoredChange(
     e => e.document.uri.toString() === currentDocumentUri
   );
 
-  // Diagnostics are now shown inline via DiagnosticsManager (squiggles in editor)
-  // Only show popup notification for errors that require manual review
-  const hasErrors = validation.violations.some(v => v.severity === 'error');
-  const violationCount = validation.violations.length;
-
-  // For warnings only, skip popup - user can see them in Problems panel
-  if (!hasErrors) {
-    // Auto-approve if no errors, just warnings
-    // The diagnostics are still visible in the Problems panel
-    return;
-  }
-
-  // Only show popup for errors requiring attention
-  const message = `Guardrail: ${violationCount} violation(s) in ${fileName}. Review required.`;
-
-  const action = await vscode.window.showWarningMessage(
-    message,
-    'Review',
-    'View Problems'
-  );
-
-  switch (action) {
-    case 'Review':
-      showDiffPreview(context, {
-        original: changeEvent.originalContent,
-        generated: changeEvent.newContent,
-        violations: validation.violations.map(v => ({
-          ruleType: v.ruleType,
-          description: v.description,
-          severity: v.severity,
-          details: v.details
-        })),
-        diff: {
-          linesAdded: validation.diff.linesAdded,
-          linesRemoved: validation.diff.linesRemoved,
-          totalLinesChanged: validation.diff.totalLinesChanged
-        },
-        fileName,
-        requiresApproval: validation.requiresApproval,
-        valid: validation.valid
-      });
-      break;
-    case 'View Problems':
-      vscode.commands.executeCommand('workbench.action.problems.focus');
-      break;
-    default:
-      // User dismissed - keep pending for later review
-      break;
-  }
+  // Violations are shown via:
+  // 1. Status bar: "Guardrail: X violations" (clickable to open Review)
+  // 2. Inline squiggles in editor
+  // No auto-open, no popup - user clicks status bar to review
 }
 
 async function handleMonitorApprove(): Promise<void> {
@@ -451,6 +476,7 @@ interface DiffPreviewData {
     description: string;
     severity: 'error' | 'warning';
     details?: string;
+    lineNumbers?: number[];
   }>;
   diff: {
     linesAdded: number;
@@ -543,24 +569,23 @@ function getWebviewContent(
 }
 
 function getInlineWebviewContent(data: DiffPreviewData): string {
+  // Format violations with line numbers
   const violations = data.violations
-    .map(v => `<li class="violation ${v.severity}">
-      <span class="type">[${v.ruleType}]</span>
-      <span class="desc">${escapeHtml(v.description)}</span>
-      ${v.details ? `<span class="details">${escapeHtml(v.details)}</span>` : ''}
-    </li>`)
+    .map(v => {
+      const lineInfo = v.lineNumbers && v.lineNumbers.length > 0
+        ? `<span class="line-info">Line ${v.lineNumbers.length === 1 ? v.lineNumbers[0] : `${v.lineNumbers[0]}-${v.lineNumbers[v.lineNumbers.length - 1]}`}</span>`
+        : '';
+      return `<li class="violation ${v.severity}">
+        <span class="type">[${v.ruleType}]</span>
+        ${lineInfo}
+        <span class="desc">${escapeHtml(v.description)}</span>
+        ${v.details ? `<span class="details">${escapeHtml(v.details)}</span>` : ''}
+      </li>`;
+    })
     .join('');
 
-  const originalLines = data.original.split('\n');
-  const generatedLines = data.generated.split('\n');
-
-  const originalHtml = originalLines
-    .map((line, i) => `<div class="line"><span class="num">${i + 1}</span><span class="content">${escapeHtml(line)}</span></div>`)
-    .join('');
-
-  const generatedHtml = generatedLines
-    .map((line, i) => `<div class="line"><span class="num">${i + 1}</span><span class="content">${escapeHtml(line)}</span></div>`)
-    .join('');
+  // Generate GitHub-style unified diff
+  const diffHtml = generateGitHubDiff(data.original, data.generated);
 
   const errorCount = data.violations.filter(v => v.severity === 'error').length;
 
@@ -628,6 +653,14 @@ function getInlineWebviewContent(data: DiffPreviewData): string {
       font-size: 10px;
       margin-right: 8px;
     }
+    .violation .line-info {
+      font-family: monospace;
+      font-size: 10px;
+      background: rgba(255,255,255,0.1);
+      padding: 2px 6px;
+      border-radius: 3px;
+      margin-right: 8px;
+    }
     .violation .details {
       display: block;
       font-size: 11px;
@@ -635,21 +668,17 @@ function getInlineWebviewContent(data: DiffPreviewData): string {
       margin-top: 4px;
     }
     .diff-container {
-      display: flex;
-      gap: 16px;
-      margin-bottom: 16px;
-    }
-    .diff-panel {
-      flex: 1;
       border: 1px solid var(--border);
       border-radius: 4px;
       overflow: hidden;
+      margin-bottom: 16px;
     }
-    .diff-panel h4 {
-      padding: 8px;
+    .diff-header {
+      padding: 8px 12px;
       background: rgba(0,0,0,0.2);
       border-bottom: 1px solid var(--border);
       font-size: 12px;
+      font-weight: bold;
     }
     .diff-content {
       max-height: 400px;
@@ -657,18 +686,50 @@ function getInlineWebviewContent(data: DiffPreviewData): string {
       font-family: monospace;
       font-size: 12px;
     }
-    .line { display: flex; }
-    .line .num {
-      min-width: 35px;
+    .diff-line {
+      display: flex;
+      line-height: 1.5;
+    }
+    .diff-line .diff-marker {
+      width: 20px;
+      text-align: center;
+      user-select: none;
+    }
+    .diff-line .line-num {
+      min-width: 40px;
       padding: 0 8px;
       text-align: right;
       opacity: 0.5;
-      border-right: 1px solid var(--border);
-      background: rgba(0,0,0,0.1);
+      user-select: none;
     }
-    .line .content {
+    .diff-line .line-content {
+      flex: 1;
       padding: 0 8px;
       white-space: pre;
+    }
+    .diff-line.added {
+      background: rgba(35, 134, 54, 0.2);
+    }
+    .diff-line.added .diff-marker {
+      color: #23d18b;
+    }
+    .diff-line.added .line-content {
+      background: rgba(35, 134, 54, 0.15);
+    }
+    .diff-line.removed {
+      background: rgba(218, 54, 51, 0.2);
+    }
+    .diff-line.removed .diff-marker {
+      color: #f14c4c;
+    }
+    .diff-line.removed .line-content {
+      background: rgba(218, 54, 51, 0.15);
+    }
+    .diff-line.unchanged {
+      background: transparent;
+    }
+    .diff-line.unchanged .diff-marker {
+      opacity: 0.3;
     }
     .actions {
       display: flex;
@@ -720,14 +781,8 @@ function getInlineWebviewContent(data: DiffPreviewData): string {
   ` : ''}
 
   <div class="diff-container">
-    <div class="diff-panel">
-      <h4>Original</h4>
-      <div class="diff-content">${originalHtml}</div>
-    </div>
-    <div class="diff-panel">
-      <h4>Generated</h4>
-      <div class="diff-content">${generatedHtml}</div>
-    </div>
+    <div class="diff-header">Changes</div>
+    <div class="diff-content">${diffHtml}</div>
   </div>
 
   <div class="actions">
@@ -761,6 +816,50 @@ function escapeHtml(text: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+/**
+ * Generate GitHub-style unified diff HTML
+ */
+function generateGitHubDiff(original: string, generated: string): string {
+  const originalLines = original.split('\n');
+  const generatedLines = generated.split('\n');
+
+  // Simple line-by-line diff
+  const maxLines = Math.max(originalLines.length, generatedLines.length);
+  const diffLines: string[] = [];
+
+  let oldLineNum = 1;
+  let newLineNum = 1;
+
+  // Create a simple diff by comparing lines
+  const originalSet = new Set(originalLines);
+  const generatedSet = new Set(generatedLines);
+
+  // Find removed lines (in original but not in generated)
+  const removedLines = originalLines.filter(line => !generatedSet.has(line));
+  // Find added lines (in generated but not in original)
+  const addedLines = generatedLines.filter(line => !originalSet.has(line));
+
+  // Build unified diff output
+  for (let i = 0; i < generatedLines.length; i++) {
+    const line = generatedLines[i];
+    const isAdded = addedLines.includes(line) && !originalLines.includes(line);
+
+    if (isAdded) {
+      diffLines.push(`<div class="diff-line added"><span class="diff-marker">+</span><span class="line-num new">${newLineNum}</span><span class="line-content">${escapeHtml(line)}</span></div>`);
+    } else {
+      diffLines.push(`<div class="diff-line unchanged"><span class="diff-marker"> </span><span class="line-num">${newLineNum}</span><span class="line-content">${escapeHtml(line)}</span></div>`);
+    }
+    newLineNum++;
+  }
+
+  // Show removed lines at the top or inline (simplified approach: show them separately)
+  const removedHtml = removedLines.map((line, i) =>
+    `<div class="diff-line removed"><span class="diff-marker">-</span><span class="line-num old">${i + 1}</span><span class="line-content">${escapeHtml(line)}</span></div>`
+  ).join('');
+
+  return removedHtml + diffLines.join('');
 }
 
 async function handleApprove(): Promise<void> {

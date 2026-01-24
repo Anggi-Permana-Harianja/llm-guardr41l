@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { loadRules, RulesConfig } from './rules';
+import { loadRules, RulesConfig, rulesFileExists } from './rules';
 import { validateAgainstRules, ValidationResult, Violation } from './diff-validator';
 import { logGeneration } from './logger';
 import { getDiagnosticsManager } from './diagnostics-manager';
@@ -62,6 +62,8 @@ export class ChangeMonitor {
   // Track multi-file change batches
   private currentBatch: ChangeBatch | null = null;
   private batchTimer: NodeJS.Timeout | null = null;
+  // Track if rules are configured
+  private hasRules: boolean = false;
 
   constructor() {
     this.config = this.loadConfig();
@@ -88,7 +90,12 @@ export class ChangeMonitor {
   }
 
   private updateStatusBar(): void {
-    if (this.config.enabled) {
+    // Show OFF if no rules configured (takes priority)
+    if (!this.hasRules) {
+      this.statusBarItem.text = '$(shield) Guardrail: OFF';
+      this.statusBarItem.tooltip = 'No rules.yaml configured. Click the "No Rules" warning to create one.';
+      this.statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
+    } else if (this.config.enabled) {
       this.statusBarItem.text = '$(shield) Guardrail: ON';
       this.statusBarItem.tooltip = 'LLM Guardrail is monitoring code changes. Click to disable.';
       this.statusBarItem.backgroundColor = undefined;
@@ -101,9 +108,22 @@ export class ChangeMonitor {
     this.statusBarItem.show();
   }
 
+  /**
+   * Set whether rules are configured (affects status bar display)
+   */
+  public setHasRules(hasRules: boolean): void {
+    this.hasRules = hasRules;
+    this.updateStatusBar();
+  }
+
   public async start(): Promise<void> {
     // Load rules
     this.rules = await loadRules();
+
+    // Update rules status for status bar and diagnostics manager
+    const hasRules = rulesFileExists();
+    this.setHasRules(hasRules);
+    getDiagnosticsManager().setHasRules(hasRules);
 
     // Take initial snapshots of all open documents
     for (const document of vscode.workspace.textDocuments) {

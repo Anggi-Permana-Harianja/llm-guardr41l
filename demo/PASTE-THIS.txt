@@ -1,15 +1,12 @@
-// ===== PASTE THIS CODE INTO app.ts FOR THE DEMO =====
-// This will trigger violations (dependency + content rules)
-
-import moment from 'moment';  // <-- Forbidden dependency!
+import moment from 'moment';
 
 export function calculateTotal(items: number[]): number {
-  console.log('Calculating total...', items);  // <-- Forbidden content!
+  console.log('Calculating total...', items);
   const result = items.reduce((sum, item) => sum + item, 0);
-  console.log('Result:', result);  // <-- Another violation!
+  console.log('Result:', result);
   return result;
 }
 
 export function formatDate(date: Date): string {
-  return moment(date).format('YYYY-MM-DD');  // Uses banned moment.js
+  return moment(date).format('YYYY-MM-DD');
 }

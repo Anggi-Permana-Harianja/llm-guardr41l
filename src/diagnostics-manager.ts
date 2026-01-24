@@ -9,6 +9,7 @@ export class DiagnosticsManager {
   private diagnosticCollection: vscode.DiagnosticCollection;
   private statusBarItem: vscode.StatusBarItem;
   private currentViolationCount: number = 0;
+  private hasRules: boolean = false;
 
   constructor() {
     this.diagnosticCollection = vscode.languages.createDiagnosticCollection('llm-guardrail');
@@ -16,7 +17,7 @@ export class DiagnosticsManager {
       vscode.StatusBarAlignment.Right,
       99 // Just below the monitor status bar (priority 100)
     );
-    this.statusBarItem.command = 'llm-guardrail.showProblemsPanel';
+    this.statusBarItem.command = 'llm-guardrail.showReviewPanel';
     this.updateStatusBar(0);
   }
 
@@ -117,6 +118,12 @@ export class DiagnosticsManager {
   private updateStatusBar(count: number): void {
     this.currentViolationCount = count;
 
+    // Don't show "Clean" status if no rules are configured
+    if (!this.hasRules) {
+      this.statusBarItem.hide();
+      return;
+    }
+
     if (count === 0) {
       this.statusBarItem.text = '$(check) Guardrail: Clean';
       this.statusBarItem.backgroundColor = undefined;
@@ -125,10 +132,18 @@ export class DiagnosticsManager {
       const icon = '$(warning)';
       this.statusBarItem.text = `${icon} Guardrail: ${count} violation${count !== 1 ? 's' : ''}`;
       this.statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
-      this.statusBarItem.tooltip = `Click to view ${count} violation${count !== 1 ? 's' : ''} in Problems panel`;
+      this.statusBarItem.tooltip = `Click to review ${count} violation${count !== 1 ? 's' : ''}`;
     }
 
     this.statusBarItem.show();
+  }
+
+  /**
+   * Set whether rules are configured (affects status bar visibility)
+   */
+  public setHasRules(hasRules: boolean): void {
+    this.hasRules = hasRules;
+    this.updateStatusBar(this.currentViolationCount);
   }
 
   /**
