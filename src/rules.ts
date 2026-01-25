@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
+import { logRuleUpdate, RuleUpdateDetail } from './logger';
 
 export type RuleType = 'scope' | 'refactor' | 'dependencies' | 'content' | 'threshold';
 
@@ -82,7 +83,7 @@ export async function addExceptionsToRules(violations: Array<{
   ruleType: string;
   description: string;
   details?: string;
-}>): Promise<boolean> {
+}>, sourceFile?: string): Promise<boolean> {
   const rulesPath = getRulesFilePath();
   if (!rulesPath || !fs.existsSync(rulesPath)) {
     console.log('Guardrail: No rules.yaml found at', rulesPath);
@@ -99,6 +100,7 @@ export async function addExceptionsToRules(violations: Array<{
     }
 
     let modified = false;
+    const ruleUpdates: RuleUpdateDetail[] = [];
 
     for (const violation of violations) {
       console.log('Guardrail: Processing violation:', violation.ruleType, violation.details);
@@ -122,6 +124,11 @@ export async function addExceptionsToRules(violations: Array<{
             if (!rule.allowed.includes(dep)) {
               rule.allowed.push(dep);
               modified = true;
+              ruleUpdates.push({
+                ruleType: 'dependencies',
+                action: 'added_to_allowed',
+                value: dep
+              });
               console.log('Guardrail: Added to allowed list:', dep);
             }
 
@@ -131,6 +138,11 @@ export async function addExceptionsToRules(violations: Array<{
               if (forbidIndex !== -1) {
                 rule.forbidden.splice(forbidIndex, 1);
                 modified = true;
+                ruleUpdates.push({
+                  ruleType: 'dependencies',
+                  action: 'removed_from_forbidden',
+                  value: dep
+                });
                 console.log('Guardrail: Removed from forbidden list:', dep);
               }
             }
@@ -151,6 +163,11 @@ export async function addExceptionsToRules(violations: Array<{
               if (forbidIndex !== -1) {
                 rule.forbid.splice(forbidIndex, 1);
                 modified = true;
+                ruleUpdates.push({
+                  ruleType: 'content',
+                  action: 'removed_from_forbid',
+                  value: pattern
+                });
                 console.log('Guardrail: Removed from forbid list:', pattern);
               }
             }
@@ -161,6 +178,11 @@ export async function addExceptionsToRules(violations: Array<{
               if (denyIndex !== -1) {
                 rule.patterns.deny.splice(denyIndex, 1);
                 modified = true;
+                ruleUpdates.push({
+                  ruleType: 'content',
+                  action: 'removed_from_deny',
+                  value: pattern
+                });
                 console.log('Guardrail: Removed from patterns.deny:', pattern);
               }
             }
@@ -180,6 +202,10 @@ export async function addExceptionsToRules(violations: Array<{
       console.log('Guardrail: Writing updated rules to:', rulesPath);
       fs.writeFileSync(rulesPath, yamlContent, 'utf8');
       console.log('Guardrail: Rules file updated successfully');
+
+      // Log the rule changes
+      logRuleUpdate(ruleUpdates, sourceFile);
+
       return true;
     }
 

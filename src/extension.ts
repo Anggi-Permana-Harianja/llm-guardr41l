@@ -911,7 +911,7 @@ async function handleApprove(): Promise<void> {
     // Update rules if there were violations that are being approved
     if (currentValidation.violations && currentValidation.violations.length > 0) {
       console.log('Guardrail: Attempting to update rules for violations:', currentValidation.violations);
-      const rulesUpdated = await addExceptionsToRules(currentValidation.violations);
+      const rulesUpdated = await addExceptionsToRules(currentValidation.violations, currentDocumentUri);
       console.log('Guardrail: Rules updated:', rulesUpdated);
       if (rulesUpdated) {
         // Reload rules in the monitor

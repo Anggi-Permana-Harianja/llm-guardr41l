@@ -3,7 +3,7 @@ import { Violation } from './diff-validator';
 export interface LogEntry {
   timestamp: string;
   id: string;
-  action: 'generate' | 'approve' | 'reject' | 'error';
+  action: 'generate' | 'approve' | 'reject' | 'error' | 'rule_update';
   prompt: string;
   context?: string;
   output?: string;

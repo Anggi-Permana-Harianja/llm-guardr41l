@@ -5,10 +5,16 @@ import { Violation } from './diff-validator';
 import { RulesConfig } from './rules';
 import { RejectionAnalyzer, saveRejectionAnalysis, showRuleSuggestions } from './rejection-analyzer';
 
+export interface RuleUpdateDetail {
+  ruleType: string;
+  action: 'added_to_allowed' | 'removed_from_forbidden' | 'removed_from_forbid' | 'removed_from_deny';
+  value: string;
+}
+
 export interface LogEntry {
   timestamp: string;
   id: string;
-  action: 'generate' | 'approve' | 'reject' | 'error';
+  action: 'generate' | 'approve' | 'reject' | 'error' | 'rule_update';
   prompt: string;
   context?: string;
   output?: string;
@@ -21,6 +27,7 @@ export interface LogEntry {
     approved?: boolean;
     linesChanged?: number;
   };
+  ruleUpdates?: RuleUpdateDetail[];
 }
 
 interface LogFile {
@@ -193,6 +200,43 @@ export function logError(
   });
 }
 
+/**
+ * Log a rule update when rules.yaml is modified via "Approve and update rules"
+ */
+export function logRuleUpdate(
+  ruleUpdates: RuleUpdateDetail[],
+  sourceFile?: string
+): string | undefined {
+  const logPath = getLogFilePath();
+
+  if (!logPath) {
+    console.warn('No workspace folder open, cannot log rule update');
+    return undefined;
+  }
+
+  const logFile = readLogFile(logPath);
+  const id = generateId();
+
+  const fullEntry: LogEntry = {
+    timestamp: new Date().toISOString(),
+    id,
+    action: 'rule_update',
+    prompt: 'Rules updated via approval',
+    violations: [],
+    rules: { rules: [] },
+    metadata: {
+      fileName: sourceFile
+    },
+    ruleUpdates
+  };
+
+  logFile.entries.push(fullEntry);
+  writeLogFile(logPath, logFile);
+
+  console.log('Guardrail: Logged rule update with', ruleUpdates.length, 'changes');
+  return id;
+}
+
 export function getRecentLogs(limit: number = 50): LogEntry[] {
   const logPath = getLogFilePath();
   if (!logPath) {return [];}
@@ -249,6 +293,22 @@ export async function showLogsInEditor(): Promise<void> {
   }
 
   const content = logs.map(entry => {
+    // Handle rule_update entries differently
+    if (entry.action === 'rule_update' && entry.ruleUpdates) {
+      const changes = entry.ruleUpdates.map(update => {
+        const actionText = update.action.replace(/_/g, ' ');
+        return `  - [${update.ruleType}] ${actionText}: "${update.value}"`;
+      }).join('\n');
+
+      return `=== ${entry.timestamp} [RULE_UPDATE] ===
+ID: ${entry.id}
+Source File: ${entry.metadata.fileName ?? 'N/A'}
+Changes:
+${changes}
+`;
+    }
+
+    // Handle other entry types
     const violationSummary = entry.violations.length > 0
       ? `Violations: ${entry.violations.map(v => v.description).join(', ')}`
       : 'No violations';
